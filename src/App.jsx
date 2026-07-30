@@ -91,10 +91,11 @@ function Header({ title, onBack, onClose }) {
   );
 }
 
-function BottomBar({ label, onClick, disabled }) {
+function BottomBar({ label, onClick, disabled, hint }) {
   if (!label) return null;
   return (
     <div className="tms-bottombar">
+      {hint && <p className="tms-bottombar-hint">{hint}</p>}
       <button className="tms-mainbutton" onClick={onClick} disabled={disabled}>{label}</button>
     </div>
   );
@@ -522,7 +523,7 @@ export default function TbilisiMiniApp() {
           ))}
         </div>
         <div className="tms-section">
-          <p className="tms-section-label">Районы работы</p>
+          <p className="tms-section-label">Районы работы {providerForm.areas.length === 0 && <span className="tms-hint-inline">— выберите хотя бы один, иначе анкету не отправить</span>}</p>
           <div className="tms-chip-wrap">
             {DISTRICTS.map((d) => <Chip key={d} label={d} active={providerForm.areas.includes(d)} onClick={() => toggleProviderArea(d)} />)}
           </div>
@@ -538,7 +539,6 @@ export default function TbilisiMiniApp() {
             value={providerForm.description} onChange={(e) => setProviderForm((f) => ({ ...f, description: e.target.value }))} />
         </div>
         {error && <p className="tms-error">{error}</p>}
-        {!ready && <p className="muted">Выберите услугу и хотя бы один район</p>}
       </div>
     );
   }
@@ -624,8 +624,17 @@ export default function TbilisiMiniApp() {
     switch (screen) {
       case "client-request":
         return { label: loading ? "Отправляю…" : "Отправить заявку", disabled: loading || !(form.district && form.urgency), onClick: submitRequest };
-      case "provider-register":
-        return { label: loading ? "Регистрирую…" : "Зарегистрироваться", disabled: loading || !(providerForm.serviceIds.length > 0 && providerForm.areas.length > 0), onClick: submitProviderRegister };
+      case "provider-register": {
+        let hint;
+        if (providerForm.serviceIds.length === 0) hint = "Выберите хотя бы одну услугу";
+        else if (providerForm.areas.length === 0) hint = "Выберите хотя бы один район работы";
+        return {
+          label: loading ? "Регистрирую…" : "Зарегистрироваться",
+          disabled: loading || !(providerForm.serviceIds.length > 0 && providerForm.areas.length > 0),
+          onClick: submitProviderRegister,
+          hint,
+        };
+      }
       case "provider-offer":
         return { label: loading ? "Отправляю…" : "Отправить отклик", disabled: loading || !offerForm.price, onClick: submitOffer };
       default:
@@ -664,6 +673,7 @@ export default function TbilisiMiniApp() {
         .tms-section-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 10px; font-weight: 500; }
         .tms-link-row { border: none; background: transparent; color: var(--accent); font-weight: 600; font-size: 13px; cursor: pointer; padding: 0; }
         .tms-textarea { width: 100%; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; font-size: 14px; resize: none; background: var(--card); color: var(--ink); }
+        .tms-hint-inline { text-transform: none; letter-spacing: normal; font-weight: 400; color: var(--muted); }
         .tms-cat-group { margin-top: 16px; }
         .tms-cat-group:first-child { margin-top: 0; }
         .tms-cat-group-title { font-size: 12px; font-weight: 600; margin: 0 0 6px; }
@@ -707,6 +717,7 @@ export default function TbilisiMiniApp() {
         .tms-select-btn { border: none; border-radius: 9px; background: var(--ink); color: var(--paper); padding: 9px 14px; font-size: 12.5px; font-weight: 600; cursor: pointer; white-space: nowrap; }
         .tms-decline-btn { border: 1px solid var(--line); background: transparent; border-radius: 9px; padding: 9px 14px; font-size: 12.5px; cursor: pointer; color: var(--muted); }
         .tms-bottombar { padding: 14px 20px calc(14px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--paper); flex-shrink: 0; }
+        .tms-bottombar-hint { margin: 0 0 8px; font-size: 12px; color: var(--muted); text-align: center; }
         .tms-mainbutton { width: 100%; border: none; border-radius: 12px; background: var(--ink); color: var(--paper); padding: 14px; font-size: 14px; font-weight: 600; cursor: pointer; }
         .tms-mainbutton:disabled { background: var(--line); color: var(--muted); cursor: default; }
         .tms-error { color: #B4532F; font-size: 12.5px; margin-top: 8px; }
@@ -715,7 +726,7 @@ export default function TbilisiMiniApp() {
       <div className="tms-phone">
         <Header title={TITLES[screen]} onBack={showBack ? goBack : null} onClose={goHome} />
         <div className="tms-body">{render()}</div>
-        <BottomBar label={bb.label} disabled={bb.disabled} onClick={bb.onClick} />
+        <BottomBar label={bb.label} disabled={bb.disabled} onClick={bb.onClick} hint={bb.hint} />
       </div>
     </div>
   );
