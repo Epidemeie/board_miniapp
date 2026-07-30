@@ -125,7 +125,7 @@ export default function TbilisiMiniApp() {
   // ---- Мастер ----
   const [provider, setProvider] = useState(null);
   const [allServices, setAllServices] = useState([]);
-  const [providerForm, setProviderForm] = useState({ description: "", priceFrom: "", serviceId: null, areas: [] });
+  const [providerForm, setProviderForm] = useState({ description: "", priceFrom: "", serviceIds: [], areas: [] });
   const [openRequests, setOpenRequests] = useState([]);
   const [offerTargetRequest, setOfferTargetRequest] = useState(null);
   const [offerForm, setOfferForm] = useState({ price: "", comment: "" });
@@ -238,9 +238,9 @@ export default function TbilisiMiniApp() {
   }
 
   async function loadOpenRequests(prov) {
-    const serviceId = prov.services?.[0]?.serviceId ?? prov.services?.[0]?.service?.id;
-    if (!serviceId) return;
-    await withLoading(async () => setOpenRequests(await api(`/requests/open?serviceId=${serviceId}`)));
+    const serviceIds = (prov.services || []).map((s) => s.serviceId ?? s.service?.id).filter(Boolean);
+    if (serviceIds.length === 0) return;
+    await withLoading(async () => setOpenRequests(await api(`/requests/open?serviceId=${serviceIds.join(",")}`)));
   }
 
   function toggleProviderArea(area) {
@@ -260,7 +260,7 @@ export default function TbilisiMiniApp() {
           username: tgUser.username,
           description: providerForm.description,
           priceFrom: providerForm.priceFrom ? Number(providerForm.priceFrom) : undefined,
-          serviceIds: [providerForm.serviceId],
+          serviceIds: providerForm.serviceIds,
           areas: providerForm.areas,
         }),
       });
@@ -268,6 +268,13 @@ export default function TbilisiMiniApp() {
       navigate("provider-home");
       await loadOpenRequests(created);
     });
+  }
+
+  function toggleProviderService(id) {
+    setProviderForm((f) => ({
+      ...f,
+      serviceIds: f.serviceIds.includes(id) ? f.serviceIds.filter((x) => x !== id) : [...f.serviceIds, id],
+    }));
   }
 
   function startOffer(request) {
@@ -482,21 +489,37 @@ export default function TbilisiMiniApp() {
   }
 
   function renderProviderRegister() {
-    const ready = providerForm.serviceId && providerForm.areas.length > 0;
+    const ready = providerForm.serviceIds.length > 0 && providerForm.areas.length > 0;
+    const groups = [];
+    const groupsByCat = {};
+    for (const s of allServices) {
+      const catId = s.category?.id ?? 0;
+      if (!groupsByCat[catId]) {
+        groupsByCat[catId] = { id: catId, name: s.category?.name || "Другое", icon: s.category?.icon || "", items: [] };
+        groups.push(groupsByCat[catId]);
+      }
+      groupsByCat[catId].items.push(s);
+    }
     return (
       <div className="tms-screen">
         <div className="tms-section">
-          <p className="tms-section-label">Какую услугу оказываете</p>
-          <div className="tms-list">
-            {allServices.map((s) => (
-              <button key={s.id}
-                className={`tms-list-row ${providerForm.serviceId === s.id ? "is-active-row" : ""}`}
-                onClick={() => setProviderForm((f) => ({ ...f, serviceId: s.id }))}>
-                <span>{s.category ? `${s.category.name} · ` : ""}{s.name}</span>
-                {providerForm.serviceId === s.id && <span>✓</span>}
-              </button>
-            ))}
-          </div>
+          <p className="tms-section-label">Какие услуги оказываете</p>
+          <p className="muted" style={{ marginTop: -6, marginBottom: 10 }}>Можно выбрать несколько</p>
+          {groups.map((group) => (
+            <div key={group.id} className="tms-cat-group">
+              <p className="tms-cat-group-title">{group.icon} {group.name}</p>
+              <div className="tms-list">
+                {group.items.map((s) => (
+                  <button key={s.id}
+                    className={`tms-list-row ${providerForm.serviceIds.includes(s.id) ? "is-active-row" : ""}`}
+                    onClick={() => toggleProviderService(s.id)}>
+                    <span>{s.name}</span>
+                    {providerForm.serviceIds.includes(s.id) && <span>✓</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
         <div className="tms-section">
           <p className="tms-section-label">Районы работы</p>
@@ -602,7 +625,7 @@ export default function TbilisiMiniApp() {
       case "client-request":
         return { label: loading ? "Отправляю…" : "Отправить заявку", disabled: loading || !(form.district && form.urgency), onClick: submitRequest };
       case "provider-register":
-        return { label: loading ? "Регистрирую…" : "Зарегистрироваться", disabled: loading || !(providerForm.serviceId && providerForm.areas.length > 0), onClick: submitProviderRegister };
+        return { label: loading ? "Регистрирую…" : "Зарегистрироваться", disabled: loading || !(providerForm.serviceIds.length > 0 && providerForm.areas.length > 0), onClick: submitProviderRegister };
       case "provider-offer":
         return { label: loading ? "Отправляю…" : "Отправить отклик", disabled: loading || !offerForm.price, onClick: submitOffer };
       default:
@@ -641,6 +664,9 @@ export default function TbilisiMiniApp() {
         .tms-section-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 10px; font-weight: 500; }
         .tms-link-row { border: none; background: transparent; color: var(--accent); font-weight: 600; font-size: 13px; cursor: pointer; padding: 0; }
         .tms-textarea { width: 100%; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; font-size: 14px; resize: none; background: var(--card); color: var(--ink); }
+        .tms-cat-group { margin-top: 16px; }
+        .tms-cat-group:first-child { margin-top: 0; }
+        .tms-cat-group-title { font-size: 12px; font-weight: 600; margin: 0 0 6px; }
         .tms-cat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
         .tms-cat-card { text-align: center; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px 6px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 8px; }
         .tms-cat-icon { font-size: 20px; }
