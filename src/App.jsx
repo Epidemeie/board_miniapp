@@ -17,81 +17,6 @@ const FACTOR_LABELS = {
 };
 const FACTOR_WEIGHTS = { service: 30, distance: 20, price: 15, rating: 15, reviews: 10, speed: 10 };
 
-/* ---------------------------------------------------------------
-   Мок-данные личного кабинета мастера — визуализация UI до того,
-   как соответствующие агрегаты появятся на backend (доход, конверсия,
-   сообщения, финансы, аналитика). Реальные данные (рейтинг, услуги,
-   районы, verified) подтягиваются из уже существующего Provider.
---------------------------------------------------------------- */
-
-const MOCK_REQUESTS = {
-  new: [
-    { id: 501, service: "Сантехника", area: "Сабуртало", urgency: "Срочно, сегодня", description: "Течёт кран на кухне, нужно заменить смеситель.", budget: 80 },
-    { id: 502, service: "Бойлеры", area: "Ваке", urgency: "На этой неделе", description: "Не греет воду, возможно сломался ТЭН.", budget: 120 },
-    { id: 503, service: "Засоры", area: "Ортачала", urgency: "Завтра", description: "Засорилась раковина в ванной.", budget: 50 },
-    { id: 504, service: "Смесители", area: "Сабуртало", urgency: "Не срочно", description: "Установить новый смеситель в ванной.", budget: 60 },
-  ],
-  inWork: [
-    { id: 495, service: "Сантехника", area: "Ваке", description: "Замена труб в санузле.", price: 150 },
-    { id: 490, service: "Бойлеры", area: "Ортачала", description: "Установка нового бойлера 80л.", price: 220 },
-  ],
-  completed: [
-    { id: 470, service: "Сантехника", area: "Ваке", price: 100, date: "24 июля" },
-    { id: 465, service: "Смесители", area: "Сабуртало", price: 70, date: "18 июля" },
-  ],
-  declined: [
-    { id: 460, service: "Электрика", area: "Диди Дигоми", reason: "Отклонено мастером" },
-  ],
-};
-
-const MOCK_ORDERS = {
-  confirmed: [
-    { id: 495, service: "Сантехника", description: "Замена труб в санузле, нужно заменить 3 метра трубы и один тройник.", price: 150, address: "ул. Тамарашвили 12, кв. 34", client: { name: "Георгий К.", photo: null, contact: "@giorgi_k" }, hasUnread: true },
-    { id: 490, service: "Бойлеры", description: "Установка нового бойлера 80л взамен старого.", price: 220, address: "пр. Чавчавадзе 45", client: { name: "Нина Т.", photo: null, contact: "+995 555 12 34 56" }, hasUnread: false },
-  ],
-  completed: [
-    { id: 470, service: "Сантехника", description: "Замена смесителя на кухне.", price: 100, address: "ул. Пекини 8", client: { name: "Анна В.", photo: null, contact: "@anna_v" } },
-  ],
-  cancelled: [
-    { id: 455, service: "Электрика", description: "Клиент отменил заказ до начала работ.", price: 0, address: "ул. Марджанишвили 5", client: { name: "Давид Л.", photo: null, contact: "@david_l" } },
-  ],
-};
-
-const MOCK_MESSAGES = {
-  495: [
-    { from: "client", text: "Добрый день! Когда сможете подъехать?", time: "10:12" },
-    { from: "me", text: "Добрый день! Буду завтра к 15:00, устроит?", time: "10:20" },
-    { from: "client", text: "Да, отлично, жду", time: "10:21" },
-  ],
-  490: [{ from: "client", text: "Здравствуйте, бойлер уже привезли?", time: "09:03" }],
-};
-
-const MOCK_REVIEWS = {
-  distribution: [
-    { stars: 5, count: 110 },
-    { stars: 4, count: 12 },
-    { stars: 3, count: 4 },
-    { stars: 2, count: 1 },
-    { stars: 1, count: 1 },
-  ],
-  list: [
-    { name: "Мария Г.", text: "Очень быстро и качественно", rating: 5, date: "28 июля" },
-    { name: "Тамаз Б.", text: "Всё сделал аккуратно, рекомендую", rating: 5, date: "22 июля" },
-    { name: "Елена С.", text: "Хорошая работа, но немного опоздал", rating: 4, date: "15 июля" },
-    { name: "Ирина Д.", text: "Отличный мастер!", rating: 5, date: "10 июля" },
-    { name: "Гоча М.", text: "Всё понравилось", rating: 5, date: "2 июля" },
-  ],
-};
-
-const MOCK_FINANCE = {
-  balance: 2450,
-  history: [
-    { date: "28 июля", requestId: 495, amount: 150 },
-    { date: "24 июля", requestId: 470, amount: 100 },
-    { date: "18 июля", requestId: 465, amount: 70 },
-  ],
-};
-
 const TAB_BAR_SCREENS = new Set([
   "provider-dashboard", "provider-requests", "provider-orders", "provider-profile-cabinet", "provider-more",
   "client-dashboard", "client-my-requests", "client-offers-all", "client-my-orders", "client-profile",
@@ -363,16 +288,15 @@ export default function TbilisiMiniApp() {
   const [allServices, setAllServices] = useState([]);
   const [providerForm, setProviderForm] = useState({ description: "", priceFrom: "", serviceIds: [], areas: [] });
 
-  // ---- Мастер: личный кабинет (визуализация, часть данных — мок) ----
+  // ---- Мастер: личный кабинет (реальные данные с backend) ----
   const [requestsTab, setRequestsTab] = useState("new");
   const [ordersTab, setOrdersTab] = useState("confirmed");
-  const [requestsState, setRequestsState] = useState(MOCK_REQUESTS);
-  const [ordersState, setOrdersState] = useState(MOCK_ORDERS);
-  const [selectedOrder, setSelectedOrder] = useState(null);
-  const [activeChatOrder, setActiveChatOrder] = useState(null);
-  const [chatMessages, setChatMessages] = useState(MOCK_MESSAGES);
-  const [chatDraft, setChatDraft] = useState("");
-  const [showAllReviews, setShowAllReviews] = useState(false);
+  const [openRequests, setOpenRequests] = useState([]); // GET /requests/open — подходящие под услуги мастера
+  const [myOffers, setMyOffers] = useState([]); // GET /offers/mine — все мои отклики + заявки по ним
+  const [dismissedRequestIds, setDismissedRequestIds] = useState(() => new Set()); // «отказаться» от новой заявки — локально в сессии, на backend такого статуса нет
+  const [selectedOffer, setSelectedOffer] = useState(null);
+  const [offerTargetRequest, setOfferTargetRequest] = useState(null);
+  const [offerForm, setOfferForm] = useState({ price: "", comment: "" });
   const [profileExtra, setProfileExtra] = useState({
     languages: ["Русский"],
     phone: "",
@@ -550,18 +474,32 @@ export default function TbilisiMiniApp() {
     }
   }
 
+  // Открытые заявки под услуги мастера + все его отклики — единственный источник
+  // данных для дашборда/заявок/заказов/аналитики, никаких чисел в отрыве от этого.
+  async function loadProviderInbox(prov) {
+    const serviceIds = (prov.services || []).map((s) => s.serviceId ?? s.service?.id).filter(Boolean);
+    const [open, offers] = await Promise.all([
+      serviceIds.length ? api(`/requests/open?serviceId=${serviceIds.join(",")}`) : Promise.resolve([]),
+      api(`/offers/mine?providerId=${prov.id}`),
+    ]);
+    setOpenRequests(open);
+    setMyOffers(offers);
+  }
+
   async function chooseProvider() {
     await withLoading(async () => {
       const existing = await api(`/providers/by-telegram/${tgUser.id}`);
       if (existing) {
-        setProvider(existing);
+        const full = await api(`/providers/${existing.id}`);
+        setProvider(full);
         setProviderForm({
-          description: existing.description || "",
-          priceFrom: existing.priceFrom ?? "",
-          serviceIds: (existing.services || []).map((s) => s.serviceId ?? s.service?.id).filter(Boolean),
-          areas: (existing.areas || []).map((a) => a.area ?? a),
+          description: full.description || "",
+          priceFrom: full.priceFrom ?? "",
+          serviceIds: (full.services || []).map((s) => s.serviceId ?? s.service?.id).filter(Boolean),
+          areas: (full.areas || []).map((a) => a.area ?? a),
         });
         await ensureAllServices();
+        await loadProviderInbox(full);
         goTab("provider-dashboard");
       } else {
         await ensureAllServices();
@@ -599,6 +537,7 @@ export default function TbilisiMiniApp() {
         }),
       });
       setProvider(created);
+      await loadProviderInbox(created);
       goTab("provider-dashboard");
     });
   }
@@ -615,79 +554,101 @@ export default function TbilisiMiniApp() {
     }));
   }
 
-  // Средний рейтинг и аналитика считаются из одних и тех же данных, которые
-  // видны пользователю на экранах «Отзывы»/«Заявки»/«Заказы» — никаких
-  // отдельных чисел-заглушек, не связанных с остальным кабинетом.
+  // Все производные числа кабинета мастера считаются из myOffers/openRequests —
+  // реальных данных backend, никаких отдельных чисел-заглушек.
+  function getOfferedRequestIds() {
+    return new Set(myOffers.map((o) => o.requestId));
+  }
+  function getNewRequests() {
+    const offered = getOfferedRequestIds();
+    return openRequests.filter((r) => !offered.has(r.id) && !dismissedRequestIds.has(r.id));
+  }
+  function getInWorkOffers() {
+    return myOffers.filter((o) => o.status === "pending" || (o.status === "accepted" && o.request.status === "matched"));
+  }
+  function getCompletedOffers() {
+    return myOffers.filter((o) => o.status === "accepted" && o.request.status === "completed");
+  }
+  function getDeclinedOffers() {
+    return myOffers.filter((o) => o.status === "declined");
+  }
+  function getConfirmedOrders() {
+    return myOffers.filter((o) => o.status === "accepted" && o.request.status === "matched");
+  }
+  function getCancelledOrders() {
+    return myOffers.filter((o) => o.request.status === "cancelled");
+  }
+
   function getReviewStats() {
-    const dist = MOCK_REVIEWS.distribution;
-    const total = dist.reduce((s, d) => s + d.count, 0);
-    const sum = dist.reduce((s, d) => s + d.count * d.stars, 0);
-    return { avg: total ? sum / total : 0, total };
+    return { avg: provider?.rating ?? 0, total: provider?.reviewCount ?? (provider?.reviews || []).length };
+  }
+  function getReviewDistribution() {
+    const counts = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+    for (const r of provider?.reviews || []) counts[r.rating] = (counts[r.rating] || 0) + 1;
+    return [5, 4, 3, 2, 1].map((stars) => ({ stars, count: counts[stars] }));
   }
 
   function getMonthIncome() {
-    return ordersState.completed.reduce((s, o) => s + (o.price || 0), 0);
+    const now = new Date();
+    return getCompletedOffers()
+      .filter((o) => {
+        const d = new Date(o.createdAt);
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      })
+      .reduce((s, o) => s + o.price, 0);
+  }
+  function getAllTimeIncome() {
+    return getCompletedOffers().reduce((s, o) => s + o.price, 0);
   }
 
   function getFunnelStats() {
-    const received = requestsState.new.length + requestsState.inWork.length + requestsState.completed.length + requestsState.declined.length;
-    const responded = requestsState.inWork.length + requestsState.completed.length + requestsState.declined.length;
-    const chosen = ordersState.confirmed.length + ordersState.completed.length;
+    const offered = getOfferedRequestIds();
+    const receivedIds = new Set([...openRequests.map((r) => r.id), ...offered]);
+    const received = receivedIds.size;
+    const responded = myOffers.length;
+    const chosen = myOffers.filter((o) => o.status === "accepted").length;
     const conversion = received ? Math.round((chosen / received) * 100) : 0;
     return { received, responded, chosen, conversion };
   }
 
   function getRepeatClients() {
-    const all = [...ordersState.confirmed, ...ordersState.completed, ...ordersState.cancelled];
     const counts = {};
-    for (const o of all) counts[o.client.contact] = (counts[o.client.contact] || 0) + 1;
+    for (const o of myOffers.filter((o) => o.status === "accepted")) {
+      const key = o.request.user.telegramId;
+      counts[key] = (counts[key] || 0) + 1;
+    }
     return Object.values(counts).filter((c) => c > 1).length;
   }
 
-  function acceptRequest(id) {
-    const item = requestsState.new.find((r) => r.id === id);
-    if (!item) return;
-    setRequestsState((s) => ({ ...s, new: s.new.filter((r) => r.id !== id), inWork: [{ ...item, price: item.budget }, ...s.inWork] }));
-    setOrdersState((s) => ({
-      ...s,
-      confirmed: [
-        {
-          id: item.id,
-          service: item.service,
-          description: item.description,
-          price: item.budget,
-          address: item.area,
-          client: { name: "Клиент по заявке", photo: null, contact: "—" },
-          hasUnread: false,
-        },
-        ...s.confirmed,
-      ],
-    }));
+  function startOffer(request) {
+    setOfferTargetRequest(request);
+    setOfferForm({ price: provider?.priceFrom ? String(provider.priceFrom) : "", comment: "" });
+    navigate("provider-offer");
   }
-  function declineRequest(id) {
-    setRequestsState((s) => {
-      const item = s.new.find((r) => r.id === id);
-      if (!item) return s;
-      return { ...s, new: s.new.filter((r) => r.id !== id), declined: [{ ...item, reason: "Отклонено мастером" }, ...s.declined] };
+
+  async function submitOffer() {
+    await withLoading(async () => {
+      await api("/offers", {
+        method: "POST",
+        body: JSON.stringify({
+          requestId: offerTargetRequest.id,
+          providerId: provider.id,
+          price: Number(offerForm.price),
+          comment: offerForm.comment,
+        }),
+      });
+      goBack();
+      await loadProviderInbox(provider);
     });
   }
 
-  function openOrderDetail(order) {
-    setSelectedOrder(order);
+  function dismissRequest(id) {
+    setDismissedRequestIds((s) => new Set(s).add(id));
+  }
+
+  function openOrderDetail(offer) {
+    setSelectedOffer(offer);
     navigate("provider-order-detail");
-  }
-
-  function openChat(order) {
-    setActiveChatOrder(order);
-    setOrdersState((s) => ({ ...s, confirmed: s.confirmed.map((o) => (o.id === order.id ? { ...o, hasUnread: false } : o)) }));
-    navigate("provider-chat");
-  }
-
-  function sendChatMessage() {
-    if (!chatDraft.trim() || !activeChatOrder) return;
-    const orderId = activeChatOrder.id;
-    setChatMessages((m) => ({ ...m, [orderId]: [...(m[orderId] || []), { from: "me", text: chatDraft.trim(), time: "сейчас" }] }));
-    setChatDraft("");
   }
 
   function sendSupportMessage() {
@@ -1224,10 +1185,35 @@ export default function TbilisiMiniApp() {
 
   /* -------------------------- Экраны: мастер — личный кабинет -------------------------- */
 
+  function renderProviderOffer() {
+    if (!offerTargetRequest) return null;
+    return (
+      <div className="tms-screen">
+        <div className="tms-section">
+          <p className="tms-section-label">Заявка</p>
+          <div className="tms-summary-pill">{offerTargetRequest.service.name} · {offerTargetRequest.area || "район не указан"}</div>
+        </div>
+        <div className="tms-section">
+          <p className="tms-section-label">Ваша цена (₾)</p>
+          <input className="tms-textarea" type="number" placeholder="80"
+            value={offerForm.price} onChange={(e) => setOfferForm((f) => ({ ...f, price: e.target.value }))} />
+        </div>
+        <div className="tms-section">
+          <p className="tms-section-label">Комментарий</p>
+          <textarea className="tms-textarea" rows={2} placeholder="Когда сможете приехать, что учли"
+            value={offerForm.comment} onChange={(e) => setOfferForm((f) => ({ ...f, comment: e.target.value }))} />
+        </div>
+        {error && <p className="tms-error">{error}</p>}
+      </div>
+    );
+  }
+
   function renderProviderDashboard() {
     const funnel = getFunnelStats();
     const monthIncome = getMonthIncome();
     const { avg: ratingAvg } = getReviewStats();
+    const newCount = getNewRequests().length;
+    const confirmedCount = getConfirmedOrders().length;
     return (
       <div className="tms-screen">
         <div className="tms-hero">
@@ -1235,12 +1221,12 @@ export default function TbilisiMiniApp() {
           <h1 className="tms-hero-title">{tgUser.name}</h1>
         </div>
         <div className="tms-stat-grid">
-          <StatCard icon="🔔" label="Новых заявок" value={requestsState.new.length} />
-          <StatCard icon="🟢" label="В работе" value={ordersState.confirmed.length} tone="accent"
+          <StatCard icon="🔔" label="Новых заявок" value={newCount} />
+          <StatCard icon="🟢" label="В работе" value={confirmedCount}
             onClick={() => { setOrdersTab("confirmed"); navigate("provider-orders"); }} />
           <StatCard icon="⭐" label="Рейтинг" value={ratingAvg.toFixed(1)}
             onClick={() => navigate("provider-reviews")} />
-          <StatCard icon="💬" label="Новых сообщений" value={ordersState.confirmed.filter((o) => o.hasUnread).length}
+          <StatCard icon="💬" label="Чаты с клиентами" value={confirmedCount}
             onClick={() => navigate("provider-messages")} />
         </div>
         <div className="tms-section">
@@ -1266,51 +1252,98 @@ export default function TbilisiMiniApp() {
   }
 
   function renderProviderRequests() {
+    const newList = getNewRequests();
+    const inWorkList = getInWorkOffers();
+    const completedList = getCompletedOffers();
+    const declinedOffers = getDeclinedOffers();
+    const dismissedList = openRequests.filter((r) => dismissedRequestIds.has(r.id));
     const tabs = [
-      { value: "new", label: "Новые", count: requestsState.new.length },
-      { value: "inWork", label: "В работе", count: requestsState.inWork.length },
-      { value: "completed", label: "Завершённые", count: requestsState.completed.length },
-      { value: "declined", label: "Отклонённые", count: requestsState.declined.length },
+      { value: "new", label: "Новые", count: newList.length },
+      { value: "inWork", label: "В работе", count: inWorkList.length },
+      { value: "completed", label: "Завершённые", count: completedList.length },
+      { value: "declined", label: "Отклонённые", count: declinedOffers.length + dismissedList.length },
     ];
-    const list = requestsState[requestsTab];
     return (
       <div className="tms-screen">
         <div className="tms-section" style={{ marginTop: 4 }}>
           <Segmented options={tabs} value={requestsTab} onChange={setRequestsTab} />
         </div>
         <div className="tms-provider-list" style={{ marginTop: 16 }}>
-          {list.map((r) => (
+          {requestsTab === "new" && newList.map((r) => (
             <div key={r.id} className="tms-provider-row">
               <div className="tms-provider-info" style={{ flex: 1 }}>
-                <span className="tms-provider-name">{r.service}</span>
-                <span className="tms-provider-meta">{r.area}{r.urgency ? ` · ${r.urgency}` : ""}</span>
+                <span className="tms-provider-name">{r.service.name}</span>
+                <span className="tms-provider-meta">{r.area || "район не указан"}{r.urgency ? ` · ${r.urgency}` : ""}</span>
                 {r.description && <span className="tms-provider-meta">{r.description}</span>}
                 {typeof r.budget === "number" && <span className="tms-provider-meta">до {r.budget} ₾</span>}
-                {typeof r.price === "number" && <span className="tms-provider-meta">{r.price} ₾</span>}
-                {r.date && <span className="tms-provider-meta">Завершено {r.date}</span>}
-                {r.reason && <span className="tms-provider-meta">{r.reason}</span>}
               </div>
-              {requestsTab === "new" && (
-                <div className="tms-offer-actions" style={{ marginTop: 0 }}>
-                  <button className="tms-select-btn" onClick={() => acceptRequest(r.id)}>Взять в работу</button>
-                  <button className="tms-decline-btn" onClick={() => declineRequest(r.id)}>Отказаться</button>
-                </div>
-              )}
+              <div className="tms-offer-actions" style={{ marginTop: 0 }}>
+                <button className="tms-select-btn" onClick={() => startOffer(r)}>Взять в работу</button>
+                <button className="tms-decline-btn" onClick={() => dismissRequest(r.id)}>Отказаться</button>
+              </div>
             </div>
           ))}
-          {list.length === 0 && <p className="muted">Здесь пока пусто.</p>}
+          {requestsTab === "inWork" && inWorkList.map((o) => (
+            <div key={o.id} className="tms-provider-row">
+              <div className="tms-provider-info" style={{ flex: 1 }}>
+                <span className="tms-provider-name">{o.request.service.name}</span>
+                <span className="tms-provider-meta">{o.request.area || "район не указан"}</span>
+                <span className="tms-provider-meta">{o.status === "pending" ? "Ждём ответа клиента" : "В работе"}</span>
+                <span className="tms-provider-meta">{o.price} ₾</span>
+              </div>
+            </div>
+          ))}
+          {requestsTab === "completed" && completedList.map((o) => (
+            <div key={o.id} className="tms-provider-row">
+              <div className="tms-provider-info" style={{ flex: 1 }}>
+                <span className="tms-provider-name">{o.request.service.name}</span>
+                <span className="tms-provider-meta">{o.price} ₾</span>
+                <span className="tms-provider-meta">Создано {new Date(o.createdAt).toLocaleDateString("ru-RU")}</span>
+              </div>
+            </div>
+          ))}
+          {requestsTab === "declined" && (
+            <>
+              {declinedOffers.map((o) => (
+                <div key={`o-${o.id}`} className="tms-provider-row">
+                  <div className="tms-provider-info" style={{ flex: 1 }}>
+                    <span className="tms-provider-name">{o.request.service.name}</span>
+                    <span className="tms-provider-meta">Клиент отклонил ваш отклик ({o.price} ₾)</span>
+                  </div>
+                </div>
+              ))}
+              {dismissedList.map((r) => (
+                <div key={`r-${r.id}`} className="tms-provider-row">
+                  <div className="tms-provider-info" style={{ flex: 1 }}>
+                    <span className="tms-provider-name">{r.service.name}</span>
+                    <span className="tms-provider-meta">Вы отказались от заявки</span>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+          {((requestsTab === "new" && newList.length === 0) ||
+            (requestsTab === "inWork" && inWorkList.length === 0) ||
+            (requestsTab === "completed" && completedList.length === 0) ||
+            (requestsTab === "declined" && declinedOffers.length === 0 && dismissedList.length === 0)) && (
+            <p className="muted">Здесь пока пусто.</p>
+          )}
         </div>
       </div>
     );
   }
 
   function renderProviderOrders() {
+    const confirmedOrders = getConfirmedOrders();
+    const completedOrders = getCompletedOffers();
+    const cancelledOrders = getCancelledOrders();
+    const listByTab = { confirmed: confirmedOrders, completed: completedOrders, cancelled: cancelledOrders };
     const tabs = [
-      { value: "confirmed", label: "Подтверждённые", count: ordersState.confirmed.length },
-      { value: "completed", label: "Завершённые", count: ordersState.completed.length },
-      { value: "cancelled", label: "Отменённые", count: ordersState.cancelled.length },
+      { value: "confirmed", label: "Подтверждённые", count: confirmedOrders.length },
+      { value: "completed", label: "Завершённые", count: completedOrders.length },
+      { value: "cancelled", label: "Отменённые", count: cancelledOrders.length },
     ];
-    const list = ordersState[ordersTab];
+    const list = listByTab[ordersTab];
     return (
       <div className="tms-screen">
         <div className="tms-section" style={{ marginTop: 4 }}>
@@ -1320,11 +1353,10 @@ export default function TbilisiMiniApp() {
           {list.map((o) => (
             <button key={o.id} className="tms-order-card" onClick={() => openOrderDetail(o)}>
               <div className="tms-provider-info" style={{ flex: 1 }}>
-                <span className="tms-provider-name">{o.service}</span>
-                <span className="tms-provider-meta">{o.client.name} · {o.address}</span>
+                <span className="tms-provider-name">{o.request.service.name}</span>
+                <span className="tms-provider-meta">{o.request.user.name} · {o.request.area || "район не указан"}</span>
               </div>
               <span className="tms-offer-terms">{o.price} ₾</span>
-              {ordersTab === "confirmed" && o.hasUnread && <span className="tms-badge">●</span>}
               <span className="tms-chevron">→</span>
             </button>
           ))}
@@ -1335,37 +1367,40 @@ export default function TbilisiMiniApp() {
   }
 
   function renderProviderOrderDetail() {
-    const o = selectedOrder;
+    const o = selectedOffer;
     if (!o) return null;
+    const telegramLink = o.request.user.username ? `https://t.me/${o.request.user.username}` : null;
     return (
       <div className="tms-screen">
         <div className="tms-section">
           <p className="tms-section-label">Описание работы</p>
-          <p className="tms-body-text">{o.description}</p>
+          <p className="tms-body-text">{o.request.description || "Без описания"}</p>
         </div>
         <div className="tms-section">
           <p className="tms-section-label">Клиент</p>
           <div className="tms-provider-main" style={{ cursor: "default" }}>
             <span className="tms-provider-avatar">👤</span>
             <span className="tms-provider-info">
-              <span className="tms-provider-name">{o.client.name}</span>
-              <span className="tms-provider-meta">{o.client.contact}</span>
+              <span className="tms-provider-name">{o.request.user.name}</span>
+              <span className="tms-provider-meta">{o.request.user.username ? `@${o.request.user.username}` : "username не указан"}</span>
             </span>
           </div>
         </div>
         <div className="tms-section">
-          <p className="tms-section-label">Адрес</p>
-          <p className="tms-body-text">{o.address}</p>
+          <p className="tms-section-label">Адрес / район</p>
+          <p className="tms-body-text">{o.request.area || "не указан"}</p>
         </div>
         <div className="tms-section">
           <p className="tms-section-label">Сумма работы</p>
           <p className="tms-body-text">{o.price} ₾</p>
         </div>
         <div className="tms-section">
-          {ordersTab === "confirmed" ? (
-            <button className="tms-select-btn" style={{ width: "100%", padding: "12px" }} onClick={() => openChat(o)}>💬 Чат с клиентом</button>
+          {telegramLink ? (
+            <a className="tms-select-btn" style={{ display: "block", width: "100%", padding: "12px", textAlign: "center", textDecoration: "none" }} href={telegramLink} target="_blank" rel="noreferrer">
+              💬 Написать в Telegram
+            </a>
           ) : (
-            <p className="muted">Чат по этому заказу перемещён в архив.</p>
+            <p className="muted">Клиент не указал username в Telegram — свяжитесь через заявку.</p>
           )}
         </div>
       </div>
@@ -1373,38 +1408,22 @@ export default function TbilisiMiniApp() {
   }
 
   function renderProviderMessages() {
+    const confirmedOrders = getConfirmedOrders();
     return (
       <div className="tms-screen">
-        <div className="tms-section"><p className="tms-section-label">Чаты по активным заказам</p></div>
+        <div className="tms-section"><p className="tms-section-label">Клиенты по активным заказам</p></div>
         <div className="tms-list">
-          {ordersState.confirmed.map((o) => {
-            const msgs = chatMessages[o.id] || [];
-            const last = msgs[msgs.length - 1];
-            return (
-              <button key={o.id} className="tms-list-row" onClick={() => openChat(o)}>
-                <span>
-                  <span style={{ fontWeight: 600 }}>{o.client.name}</span>
-                  {last && <span className="tms-provider-meta" style={{ display: "block" }}>{last.text}</span>}
-                </span>
-                {o.hasUnread ? <span className="tms-badge">●</span> : <span className="tms-chevron">→</span>}
-              </button>
-            );
-          })}
-          {ordersState.confirmed.length === 0 && <p className="muted">Активных заказов пока нет.</p>}
+          {confirmedOrders.map((o) => (
+            <button key={o.id} className="tms-list-row" onClick={() => openOrderDetail(o)}>
+              <span>
+                <span style={{ fontWeight: 600 }}>{o.request.user.name}</span>
+                <span className="tms-provider-meta" style={{ display: "block" }}>{o.request.service.name}</span>
+              </span>
+              <span className="tms-chevron">→</span>
+            </button>
+          ))}
+          {confirmedOrders.length === 0 && <p className="muted">Активных заказов пока нет.</p>}
         </div>
-      </div>
-    );
-  }
-
-  function renderProviderChat() {
-    if (!activeChatOrder) return null;
-    const msgs = chatMessages[activeChatOrder.id] || [];
-    return (
-      <div className="tms-screen" style={{ paddingBottom: 8 }}>
-        <div className="tms-section" style={{ marginTop: 0 }}>
-          <p className="tms-section-label">{activeChatOrder.service} · {activeChatOrder.client.name}</p>
-        </div>
-        <ChatThread messages={msgs} />
       </div>
     );
   }
@@ -1542,8 +1561,15 @@ export default function TbilisiMiniApp() {
 
   function renderProviderReviews(all) {
     const { avg: rating, total } = getReviewStats();
-    const maxCount = Math.max(...MOCK_REVIEWS.distribution.map((d) => d.count));
-    const list = all ? MOCK_REVIEWS.list : MOCK_REVIEWS.list.slice(0, 3);
+    const distribution = getReviewDistribution();
+    const maxCount = Math.max(1, ...distribution.map((d) => d.count));
+    const reviews = provider?.reviews || [];
+    const list = (all ? reviews : reviews.slice(0, 3)).map((r) => ({
+      name: r.user?.name || "Клиент",
+      text: r.text,
+      rating: r.rating,
+      date: new Date(r.createdAt).toLocaleDateString("ru-RU"),
+    }));
     return (
       <div className="tms-screen">
         {!all && (
@@ -1555,7 +1581,7 @@ export default function TbilisiMiniApp() {
                 <span className="tms-provider-meta">{total} отзывов</span>
               </div>
               <div className="tms-review-bars">
-                {MOCK_REVIEWS.distribution.map((d) => (
+                {distribution.map((d) => (
                   <div className="tms-review-bar-row" key={d.stars}>
                     <span className="tms-provider-meta">{d.stars} ★</span>
                     <span className="tms-legend-bar-track"><span className="tms-legend-bar-fill" style={{ width: `${(d.count / maxCount) * 100}%` }} /></span>
@@ -1571,7 +1597,8 @@ export default function TbilisiMiniApp() {
           <div className="tms-list-plain">
             {list.map((r, i) => <ReviewRow key={i} review={r} />)}
           </div>
-          {!all && (
+          {list.length === 0 && <p className="muted">Отзывов пока нет.</p>}
+          {!all && reviews.length > 3 && (
             <button className="tms-link-row" style={{ marginTop: 12 }} onClick={() => navigate("provider-reviews-all")}>
               Показать все отзывы →
             </button>
@@ -1582,25 +1609,30 @@ export default function TbilisiMiniApp() {
   }
 
   function renderProviderFinance() {
+    const balance = getAllTimeIncome();
+    const history = getCompletedOffers()
+      .map((o) => ({ date: new Date(o.createdAt).toLocaleDateString("ru-RU"), requestId: o.requestId, amount: o.price }))
+      .sort((a, b) => b.requestId - a.requestId);
     return (
       <div className="tms-screen">
-        <p className="tms-inprogress-note">Раздел в разработке — данные для наглядности</p>
+        <p className="tms-inprogress-note">Раздел в разработке — сумма и история уже реальные, оформление появится позже</p>
         <div className="tms-section" style={{ marginTop: 4 }}>
           <div className="tms-income-card">
             <span className="tms-provider-meta">Баланс</span>
-            <span className="tms-income-value">{MOCK_FINANCE.balance.toLocaleString("ru-RU")} ₾</span>
+            <span className="tms-income-value">{balance.toLocaleString("ru-RU")} ₾</span>
           </div>
         </div>
         <div className="tms-section">
           <p className="tms-section-label">История операций</p>
           <div className="tms-list">
-            {MOCK_FINANCE.history.map((h, i) => (
+            {history.map((h, i) => (
               <div key={i} className="tms-list-row" style={{ cursor: "default" }}>
                 <span>{h.date} · заявка №{h.requestId}</span>
                 <span>+{h.amount} ₾</span>
               </div>
             ))}
           </div>
+          {history.length === 0 && <p className="muted">Завершённых заказов пока нет.</p>}
         </div>
       </div>
     );
@@ -1710,7 +1742,7 @@ export default function TbilisiMiniApp() {
       case "provider-orders": return renderProviderOrders();
       case "provider-order-detail": return renderProviderOrderDetail();
       case "provider-messages": return renderProviderMessages();
-      case "provider-chat": return renderProviderChat();
+      case "provider-offer": return renderProviderOffer();
       case "provider-profile-cabinet": return renderProviderProfileCabinet();
       case "provider-more": return renderProviderMore();
       case "provider-analytics": return renderProviderAnalytics();
@@ -1746,7 +1778,7 @@ export default function TbilisiMiniApp() {
     "provider-orders": "Заказы",
     "provider-order-detail": "Заказ",
     "provider-messages": "Сообщения",
-    "provider-chat": "Чат с клиентом",
+    "provider-offer": "Ваш отклик",
     "provider-profile-cabinet": "Профиль",
     "provider-more": "Ещё",
     "provider-analytics": "Аналитика",
@@ -1766,6 +1798,8 @@ export default function TbilisiMiniApp() {
         return { label: "Готово", disabled: false, onClick: () => goTab("client-dashboard") };
       case "client-review":
         return { label: loading ? "Сохраняю…" : "Оставить отзыв и завершить", disabled: loading, onClick: submitReview };
+      case "provider-offer":
+        return { label: loading ? "Отправляю…" : "Отправить отклик", disabled: loading || !offerForm.price, onClick: submitOffer };
       case "provider-register": {
         let hint;
         if (providerForm.serviceIds.length === 0) hint = "Выберите хотя бы одну услугу";
@@ -1784,8 +1818,8 @@ export default function TbilisiMiniApp() {
 
   const bb = bottomBarConfig() || {};
   // Экран профиля мастера использует ту же вкладку "Профиль" в таб-баре, но переход
-  // на неё должен подгружать список услуг; клиентские вкладки при каждом заходе
-  // тихо обновляют список заявок/предложений — используем общий обработчик клика.
+  // на неё должен подгружать список услуг; остальные вкладки при каждом заходе тихо
+  // обновляют заявки/отклики — используем общий обработчик клика таб-бара.
   function handleTabNavigate(key) {
     if (key === "provider-profile-cabinet") {
       openProfileTab();
@@ -1794,14 +1828,14 @@ export default function TbilisiMiniApp() {
     goTab(key);
     if (key.startsWith("client-") && key !== "client-profile") {
       loadMyRequests().catch((e) => setError(e.message));
+    } else if (key.startsWith("provider-") && provider) {
+      loadProviderInbox(provider).catch((e) => setError(e.message));
     }
   }
   const showBack = history.length > 0;
 
   let bottomArea = null;
-  if (screen === "provider-chat") {
-    bottomArea = <ChatInputBar value={chatDraft} onChange={setChatDraft} onSend={sendChatMessage} />;
-  } else if (screen === "provider-support" || screen === "client-support") {
+  if (screen === "provider-support" || screen === "client-support") {
     bottomArea = <ChatInputBar value={supportDraft} onChange={setSupportDraft} onSend={sendSupportMessage} />;
   } else if (TAB_BAR_SCREENS.has(screen)) {
     const tabs = screen.startsWith("client-") ? CLIENT_TABS : PROVIDER_TABS;
