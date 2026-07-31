@@ -272,6 +272,111 @@ const RU_TO_EN = {
   "Расстояние": "Distance",
   "Цена": "Price",
   "Скорость ответа": "Response speed",
+  // Категории и услуги — фиксированный список, который ведёт админ (не
+  // произвольный текст от пользователей, поэтому переводим). Новую
+  // категорию/услугу в админке — сразу добавлять перевод сюда, иначе
+  // она останется на русском для англоязычных пользователей.
+  "Дом и быт": "Home & Household",
+  "Ремонт": "Repair",
+  "Уборка": "Cleaning",
+  "Перевозки": "Moving & Delivery",
+  "Сад и участок": "Garden & Yard",
+  "IT и техника": "IT & Tech",
+  "Цифровые услуги": "Digital Services",
+  "Обучение": "Education",
+  "Здоровье": "Health",
+  "Красота": "Beauty",
+  "Животные": "Pets",
+  "Фото и видео": "Photo & Video",
+  "Мероприятия": "Events",
+  "Бизнес": "Business",
+  "Авто": "Auto",
+  "Недвижимость": "Real Estate",
+  "Дети": "Kids",
+  "Помощь пожилым": "Elderly Care",
+  "Путешествия": "Travel",
+  "Муж на час": "Handyman",
+  "Сборка мебели": "Furniture Assembly",
+  "Установка техники": "Appliance Installation",
+  "Мелкий ремонт": "Minor Repairs",
+  "Сантехник": "Plumber",
+  "Электрик": "Electrician",
+  "Ремонт техники": "Appliance Repair",
+  "Ремонт мебели": "Furniture Repair",
+  "Кондиционеры": "Air Conditioning",
+  "Замки": "Locksmith",
+  "Генеральная уборка": "Deep Cleaning",
+  "Уборка после ремонта": "Post-Renovation Cleaning",
+  "Мойка окон": "Window Washing",
+  "Химчистка мебели": "Furniture Dry Cleaning",
+  "Грузчики": "Movers",
+  "Переезды": "Relocation",
+  "Курьеры": "Couriers",
+  "Эвакуатор": "Tow Truck",
+  "Покос травы": "Lawn Mowing",
+  "Спил деревьев": "Tree Removal",
+  "Полив": "Watering",
+  "Уборка участка": "Yard Cleanup",
+  "Настройка ПК": "PC Setup",
+  "Wi-Fi": "Wi-Fi Setup",
+  "Видеонаблюдение": "CCTV Installation",
+  "Установка ПО": "Software Installation",
+  "Ремонт ноутбуков": "Laptop Repair",
+  "Дизайн": "Design",
+  "Сайты": "Websites",
+  "Монтаж видео": "Video Editing",
+  "Копирайтинг": "Copywriting",
+  "Перевод": "Translation",
+  "Настройка рекламы": "Ad Setup",
+  "Репетиторы": "Tutors",
+  "Музыка": "Music",
+  "Спорт": "Sports",
+  "Подготовка к экзаменам": "Exam Prep",
+  "Массаж": "Massage",
+  "Сиделки": "Caregivers",
+  "Медсестры на дом": "Home Nursing",
+  "Парикмахер": "Hairdresser",
+  "Барбер": "Barber",
+  "Маникюр": "Manicure",
+  "Визажист": "Makeup Artist",
+  "Косметолог": "Beautician",
+  "Выгул собак": "Dog Walking",
+  "Груминг": "Grooming",
+  "Передержка": "Pet Sitting",
+  "Ветеринар": "Veterinarian",
+  "Фотограф": "Photographer",
+  "Видеограф": "Videographer",
+  "Дрон": "Drone Shooting",
+  "Обработка фото": "Photo Editing",
+  "Ведущий": "Host / MC",
+  "DJ": "DJ",
+  "Аниматор": "Entertainer",
+  "Декоратор": "Decorator",
+  "Кейтеринг": "Catering",
+  "Юрист": "Lawyer",
+  "Бухгалтер": "Accountant",
+  "Налоговый консультант": "Tax Consultant",
+  "Регистрация компаний": "Company Registration",
+  "Автоэлектрик": "Auto Electrician",
+  "Диагностика": "Diagnostics",
+  "Шиномонтаж": "Tire Service",
+  "Мойка": "Car Wash",
+  "Детейлинг": "Detailing",
+  "Риелтор": "Realtor",
+  "Оценка": "Appraisal",
+  "Приёмка квартиры": "Apartment Inspection",
+  "Хоумстейджинг": "Home Staging",
+  "Няня": "Nanny",
+  "Детский аниматор": "Kids' Entertainer",
+  "Логопед": "Speech Therapist",
+  "Психолог": "Psychologist",
+  "Сиделка": "Caregiver",
+  "Сопровождение": "Companion Care",
+  "Доставка продуктов": "Grocery Delivery",
+  "Гид": "Guide",
+  "Трансфер": "Transfer",
+  "Переводчик": "Interpreter",
+  "Помощь туристам": "Tourist Assistance",
 };
 
 const TAB_BAR_SCREENS = new Set([
@@ -1000,7 +1105,7 @@ export default function TbilisiMiniApp() {
             {categories.map((cat) => (
               <button key={cat.id} className="tms-cat-card" onClick={() => pickCategory(cat)}>
                 <span className="tms-cat-icon">{cat.icon || "•"}</span>
-                <span className="tms-cat-name">{cat.name}</span>
+                <span className="tms-cat-name">{t(cat.name)}</span>
               </button>
             ))}
           </div>
@@ -1016,12 +1121,12 @@ export default function TbilisiMiniApp() {
     return (
       <div className="tms-screen">
         <div className="tms-section">
-          <p className="tms-section-label">{form.categoryName}</p>
+          <p className="tms-section-label">{t(form.categoryName)}</p>
           {loading && <p className="muted">{t("Загрузка…")}</p>}
           <div className="tms-list">
             {services.map((s) => (
               <button key={s.id} className="tms-list-row" onClick={() => pickService(s)}>
-                <span>{s.name}</span><span className="tms-chevron">→</span>
+                <span>{t(s.name)}</span><span className="tms-chevron">→</span>
               </button>
             ))}
           </div>
@@ -1036,7 +1141,7 @@ export default function TbilisiMiniApp() {
       <div className="tms-screen">
         <div className="tms-section">
           <p className="tms-section-label">{t("Услуга")}</p>
-          <div className="tms-summary-pill">{form.categoryName} · {form.serviceName}</div>
+          <div className="tms-summary-pill">{t(form.categoryName)} · {t(form.serviceName)}</div>
         </div>
         <div className="tms-section">
           <p className="tms-section-label">{t("Описание")}</p>
@@ -1114,7 +1219,7 @@ export default function TbilisiMiniApp() {
           <span className="tms-provider-avatar">👤</span>
           <div>
             <p className="tms-provider-name">{o.provider.user.name}</p>
-            <p className="tms-provider-meta">★ {o.provider.rating.toFixed(1)}{showRequestLabel ? ` · ${t("Заявка")}: ${o.request.service.name}` : ""}</p>
+            <p className="tms-provider-meta">★ {o.provider.rating.toFixed(1)}{showRequestLabel ? ` · ${t("Заявка")}: ${t(o.request.service.name)}` : ""}</p>
           </div>
           <p className="tms-offer-terms">{o.price} ₾</p>
         </div>
@@ -1204,7 +1309,7 @@ export default function TbilisiMiniApp() {
     return (
       <div className="tms-screen">
         <div className="tms-section" style={{ marginTop: 4 }}>
-          <p className="tms-section-label">{r.service.name}</p>
+          <p className="tms-section-label">{t(r.service.name)}</p>
           <p className="tms-body-text">{r.description || t("Без описания")}</p>
         </div>
         <div className="tms-section">
@@ -1255,7 +1360,7 @@ export default function TbilisiMiniApp() {
   function renderClientProviderView() {
     const p = viewedProvider;
     if (!p) return null;
-    const specialization = (p.services || []).map((s) => s.service?.name).filter(Boolean).join(", ");
+    const specialization = (p.services || []).map((s) => s.service?.name).filter(Boolean).map(t).join(", ");
     return (
       <div className="tms-screen">
         <div className="tms-section" style={{ marginTop: 4 }}>
@@ -1287,7 +1392,7 @@ export default function TbilisiMiniApp() {
       <button key={r.id} className="tms-order-card" onClick={() => openClientOrder(r)}>
         <div className="tms-provider-info" style={{ flex: 1 }}>
           <span className="tms-provider-name">{offer?.provider.user.name || t("Мастер")}{offer ? ` · ★${offer.provider.rating.toFixed(1)}` : ""}</span>
-          <span className="tms-provider-meta">{r.service.name}{locallyCompletedRequestIds.has(r.id) ? ` ${t("· Завершён")}` : ""}</span>
+          <span className="tms-provider-meta">{t(r.service.name)}{locallyCompletedRequestIds.has(r.id) ? ` ${t("· Завершён")}` : ""}</span>
         </div>
         <span className="tms-offer-terms">{offer?.price ?? r.budget} ₾</span>
         <span className="tms-chevron">→</span>
@@ -1331,7 +1436,7 @@ export default function TbilisiMiniApp() {
             <span className="tms-provider-avatar" style={{ fontSize: 32 }}>👤</span>
             <div>
               <p className="tms-provider-name" style={{ fontSize: 16 }}>{offer?.provider.user.name || t("Мастер")}</p>
-              <p className="tms-provider-meta">{r.service.name}</p>
+              <p className="tms-provider-meta">{t(r.service.name)}</p>
             </div>
             {offer && <span className={`tms-badge-verify ${offer.provider.verified ? "is-verified" : ""}`}>{t(offer.provider.verified ? "✅ Подтверждён" : "⏳ На проверке")}</span>}
           </div>
@@ -1385,7 +1490,7 @@ export default function TbilisiMiniApp() {
       <div className="tms-screen">
         <div className="tms-section" style={{ marginTop: 4 }}>
           <p className="tms-section-label">{t("Оцените мастера")}</p>
-          <p className="muted">{offer?.provider.user.name} · {r.service.name}</p>
+          <p className="muted">{offer?.provider.user.name} · {t(r.service.name)}</p>
         </div>
         <div className="tms-section">
           <StarPicker value={reviewForm.rating} onChange={(rating) => setReviewForm((f) => ({ ...f, rating }))} t={t} />
@@ -1471,13 +1576,13 @@ export default function TbilisiMiniApp() {
           <p className="muted" style={{ marginTop: -6, marginBottom: 10 }}>{t("Можно выбрать несколько")}</p>
           {groups.map((group) => (
             <div key={group.id} className="tms-cat-group">
-              <p className="tms-cat-group-title">{group.icon} {group.name}</p>
+              <p className="tms-cat-group-title">{group.icon} {t(group.name)}</p>
               <div className="tms-list">
                 {group.items.map((s) => (
                   <button key={s.id}
                     className={`tms-list-row ${providerForm.serviceIds.includes(s.id) ? "is-active-row" : ""}`}
                     onClick={() => toggleProviderService(s.id)}>
-                    <span>{s.name}</span>
+                    <span>{t(s.name)}</span>
                     {providerForm.serviceIds.includes(s.id) && <span>✓</span>}
                   </button>
                 ))}
@@ -1514,7 +1619,7 @@ export default function TbilisiMiniApp() {
       <div className="tms-screen">
         <div className="tms-section">
           <p className="tms-section-label">{t("Заявка")}</p>
-          <div className="tms-summary-pill">{offerTargetRequest.service.name} · {t(offerTargetRequest.area) || t("район не указан")}</div>
+          <div className="tms-summary-pill">{t(offerTargetRequest.service.name)} · {t(offerTargetRequest.area) || t("район не указан")}</div>
         </div>
         <div className="tms-section">
           <p className="tms-section-label">{t("Ваша цена (₾)")}</p>
@@ -1595,7 +1700,7 @@ export default function TbilisiMiniApp() {
           {requestsTab === "new" && newList.map((r) => (
             <div key={r.id} className="tms-provider-row">
               <div className="tms-provider-info" style={{ flex: 1 }}>
-                <span className="tms-provider-name">{r.service.name}</span>
+                <span className="tms-provider-name">{t(r.service.name)}</span>
                 <span className="tms-provider-meta">{t(r.area) || t("район не указан")}{r.urgency ? ` · ${t(r.urgency)}` : ""}</span>
                 {r.description && <span className="tms-provider-meta">{r.description}</span>}
                 {typeof r.budget === "number" && <span className="tms-provider-meta">{language === "en" ? "up to" : "до"} {r.budget} ₾</span>}
@@ -1609,7 +1714,7 @@ export default function TbilisiMiniApp() {
           {requestsTab === "inWork" && inWorkList.map((o) => (
             <div key={o.id} className="tms-provider-row">
               <div className="tms-provider-info" style={{ flex: 1 }}>
-                <span className="tms-provider-name">{o.request.service.name}</span>
+                <span className="tms-provider-name">{t(o.request.service.name)}</span>
                 <span className="tms-provider-meta">{t(o.request.area) || t("район не указан")}</span>
                 <span className="tms-provider-meta">{t(o.status === "pending" ? "Ждём ответа клиента" : "В работе")}</span>
                 <span className="tms-provider-meta">{o.price} ₾</span>
@@ -1619,7 +1724,7 @@ export default function TbilisiMiniApp() {
           {requestsTab === "completed" && completedList.map((o) => (
             <div key={o.id} className="tms-provider-row">
               <div className="tms-provider-info" style={{ flex: 1 }}>
-                <span className="tms-provider-name">{o.request.service.name}</span>
+                <span className="tms-provider-name">{t(o.request.service.name)}</span>
                 <span className="tms-provider-meta">{o.price} ₾</span>
                 <span className="tms-provider-meta">{t("Создано")} {new Date(o.createdAt).toLocaleDateString(locale)}</span>
               </div>
@@ -1630,7 +1735,7 @@ export default function TbilisiMiniApp() {
               {declinedOffers.map((o) => (
                 <div key={`o-${o.id}`} className="tms-provider-row">
                   <div className="tms-provider-info" style={{ flex: 1 }}>
-                    <span className="tms-provider-name">{o.request.service.name}</span>
+                    <span className="tms-provider-name">{t(o.request.service.name)}</span>
                     <span className="tms-provider-meta">{t("Клиент отклонил ваш отклик")} ({o.price} ₾)</span>
                   </div>
                 </div>
@@ -1638,7 +1743,7 @@ export default function TbilisiMiniApp() {
               {dismissedList.map((r) => (
                 <div key={`r-${r.id}`} className="tms-provider-row">
                   <div className="tms-provider-info" style={{ flex: 1 }}>
-                    <span className="tms-provider-name">{r.service.name}</span>
+                    <span className="tms-provider-name">{t(r.service.name)}</span>
                     <span className="tms-provider-meta">{t("Вы отказались от заявки")}</span>
                   </div>
                 </div>
@@ -1676,7 +1781,7 @@ export default function TbilisiMiniApp() {
           {list.map((o) => (
             <button key={o.id} className="tms-order-card" onClick={() => openOrderDetail(o)}>
               <div className="tms-provider-info" style={{ flex: 1 }}>
-                <span className="tms-provider-name">{o.request.service.name}</span>
+                <span className="tms-provider-name">{t(o.request.service.name)}</span>
                 <span className="tms-provider-meta">{o.request.user.name} · {t(o.request.area) || t("район не указан")}</span>
               </div>
               <span className="tms-offer-terms">{o.price} ₾</span>
@@ -1740,7 +1845,7 @@ export default function TbilisiMiniApp() {
             <button key={o.id} className="tms-list-row" onClick={() => openOrderDetail(o)}>
               <span>
                 <span style={{ fontWeight: 600 }}>{o.request.user.name}</span>
-                <span className="tms-provider-meta" style={{ display: "block" }}>{o.request.service.name}</span>
+                <span className="tms-provider-meta" style={{ display: "block" }}>{t(o.request.service.name)}</span>
               </span>
               <span className="tms-chevron">→</span>
             </button>
@@ -1755,7 +1860,7 @@ export default function TbilisiMiniApp() {
     const groups = groupServicesByCategory(allServices, t);
     const selectedCategoryNames = [
       ...new Set(allServices.filter((s) => providerForm.serviceIds.includes(s.id)).map((s) => s.category?.name).filter(Boolean)),
-    ];
+    ].map(t);
     return (
       <div className="tms-screen">
         <div className="tms-section" style={{ marginTop: 4 }}>
@@ -1812,13 +1917,13 @@ export default function TbilisiMiniApp() {
           <p className="tms-section-label">{t("Услуги")}</p>
           {groups.map((group) => (
             <div key={group.id} className="tms-cat-group">
-              <p className="tms-cat-group-title">{group.icon} {group.name}</p>
+              <p className="tms-cat-group-title">{group.icon} {t(group.name)}</p>
               <div className="tms-list">
                 {group.items.map((s) => (
                   <button key={s.id}
                     className={`tms-list-row ${providerForm.serviceIds.includes(s.id) ? "is-active-row" : ""}`}
                     onClick={() => toggleProviderService(s.id)}>
-                    <span>{s.name}</span>
+                    <span>{t(s.name)}</span>
                     {providerForm.serviceIds.includes(s.id) && <span>✓</span>}
                   </button>
                 ))}
