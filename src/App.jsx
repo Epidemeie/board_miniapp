@@ -92,7 +92,10 @@ const MOCK_FINANCE = {
   ],
 };
 
-const TAB_BAR_SCREENS = new Set(["provider-dashboard", "provider-requests", "provider-orders", "provider-profile-cabinet", "provider-more"]);
+const TAB_BAR_SCREENS = new Set([
+  "provider-dashboard", "provider-requests", "provider-orders", "provider-profile-cabinet", "provider-more",
+  "client-dashboard", "client-my-requests", "client-offers-all", "client-my-orders", "client-profile",
+]);
 
 /* ---------------------------------------------------------------
    Telegram: кто открыл Mini App
@@ -195,14 +198,23 @@ function BottomBar({ label, onClick, disabled, hint }) {
   );
 }
 
-function ProviderTabBar({ active, onNavigate }) {
-  const items = [
-    { key: "provider-dashboard", icon: "🏠", label: "Главная" },
-    { key: "provider-requests", icon: "📋", label: "Заявки" },
-    { key: "provider-orders", icon: "📦", label: "Заказы" },
-    { key: "provider-profile-cabinet", icon: "👤", label: "Профиль" },
-    { key: "provider-more", icon: "⋯", label: "Ещё" },
-  ];
+const PROVIDER_TABS = [
+  { key: "provider-dashboard", icon: "🏠", label: "Главная" },
+  { key: "provider-requests", icon: "📋", label: "Заявки" },
+  { key: "provider-orders", icon: "📦", label: "Заказы" },
+  { key: "provider-profile-cabinet", icon: "👤", label: "Профиль" },
+  { key: "provider-more", icon: "⋯", label: "Ещё" },
+];
+
+const CLIENT_TABS = [
+  { key: "client-dashboard", icon: "🏠", label: "Главная" },
+  { key: "client-my-requests", icon: "📋", label: "Заявки" },
+  { key: "client-offers-all", icon: "🤝", label: "Предложения" },
+  { key: "client-my-orders", icon: "📦", label: "Заказы" },
+  { key: "client-profile", icon: "👤", label: "Профиль" },
+];
+
+function TabBar({ items, active, onNavigate }) {
   return (
     <div className="tms-tabbar">
       {items.map((it) => (
@@ -283,6 +295,18 @@ function ChatThread({ messages }) {
   );
 }
 
+function StarPicker({ value, onChange }) {
+  return (
+    <div className="tms-starpicker">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button key={n} type="button" className="tms-starpicker-btn" onClick={() => onChange(n)} aria-label={`${n} звёзд`}>
+          {n <= value ? "★" : "☆"}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function ChatInputBar({ value, onChange, onSend }) {
   return (
     <div className="tms-chatbar">
@@ -305,15 +329,34 @@ export default function TbilisiMiniApp() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // ---- Клиент ----
+  // ---- Клиент: создание заявки (существующий рабочий поток) ----
   const [categories, setCategories] = useState([]);
   const [services, setServices] = useState([]);
   const [form, setForm] = useState({ categoryId: null, categoryName: null, serviceId: null, serviceName: null, description: "", district: null, urgency: null, budget: 100 });
   const [candidates, setCandidates] = useState([]);
-  const [myRequests, setMyRequests] = useState([]);
-  const [selectedRequest, setSelectedRequest] = useState(null);
-  const [selectedOffers, setSelectedOffers] = useState([]);
   const [expandedCandidate, setExpandedCandidate] = useState(null);
+
+  // ---- Клиент: личный кабинет (заявки/предложения/заказы — реальные данные с backend) ----
+  const [myRequests, setMyRequests] = useState([]);
+  const [selectedRequestId, setSelectedRequestId] = useState(null);
+  const [viewedProvider, setViewedProvider] = useState(null);
+  const [selectedClientOrderId, setSelectedClientOrderId] = useState(null);
+  const [reviewTargetRequestId, setReviewTargetRequestId] = useState(null);
+  const [reviewForm, setReviewForm] = useState({ rating: 5, text: "" });
+  // Публичного эндпоинта «завершить заказ» на backend пока нет (только admin) —
+  // фактическое завершение и отзыв (POST /reviews) реальны, а статус заказа
+  // «завершён» до появления такого эндпоинта отслеживаем локально в сессии.
+  const [locallyCompletedRequestIds, setLocallyCompletedRequestIds] = useState(() => new Set());
+  const [submittedReviews, setSubmittedReviews] = useState({});
+  const [clientSettingsForm, setClientSettingsForm] = useState({
+    name: tgUser.name,
+    phone: "",
+    email: "",
+    notifyOrders: true,
+    notifyChat: true,
+    appLanguage: "Русский",
+  });
+  const [clientShowDeleteConfirm, setClientShowDeleteConfirm] = useState(false);
 
   // ---- Мастер: регистрация / реальные данные ----
   const [provider, setProvider] = useState(null);
@@ -394,9 +437,20 @@ export default function TbilisiMiniApp() {
 
   // ---- Роль: клиент ----
 
+  async function loadMyRequests() {
+    setMyRequests(await api(`/requests/mine?telegramId=${tgUser.id}`));
+  }
+
   async function chooseClient() {
+    await withLoading(loadMyRequests);
+    goTab("client-dashboard");
+  }
+
+  function openCreateRequest() {
     navigate("client-home");
-    await withLoading(async () => setCategories(await api("/categories")));
+    if (categories.length === 0) {
+      withLoading(async () => setCategories(await api("/categories"))).catch(() => {});
+    }
   }
 
   async function pickCategory(cat) {
@@ -427,26 +481,64 @@ export default function TbilisiMiniApp() {
       });
       const matched = await api(`/requests/${created.id}/candidates`);
       setCandidates(matched);
+      await loadMyRequests();
       navigate("client-matches");
     });
   }
 
-  async function openMyRequests() {
-    navigate("client-my");
-    await withLoading(async () => setMyRequests(await api(`/requests/mine?telegramId=${tgUser.id}`)));
-  }
-
-  async function openRequestOffers(request) {
-    setSelectedRequest(request);
-    navigate("client-offers");
-    await withLoading(async () => setSelectedOffers(await api(`/offers/request/${request.id}`)));
+  function openRequestDetail(request) {
+    setSelectedRequestId(request.id);
+    navigate("client-request-detail");
   }
 
   async function respondToOffer(offerId, status) {
     await withLoading(async () => {
       await api(`/offers/${offerId}/respond`, { method: "PUT", body: JSON.stringify({ status }) });
-      setSelectedOffers(await api(`/offers/request/${selectedRequest.id}`));
+      await loadMyRequests();
     });
+  }
+
+  async function viewProvider(providerId) {
+    await withLoading(async () => setViewedProvider(await api(`/providers/${providerId}`)));
+    navigate("client-provider-view");
+  }
+
+  function openClientOrder(request) {
+    setSelectedClientOrderId(request.id);
+    navigate("client-order-detail");
+  }
+
+  function startReview(request) {
+    setReviewTargetRequestId(request.id);
+    setReviewForm({ rating: 5, text: "" });
+    navigate("client-review");
+  }
+
+  async function submitReview() {
+    const request = myRequests.find((r) => r.id === reviewTargetRequestId);
+    const acceptedOffer = request?.offers.find((o) => o.status === "accepted");
+    if (!request || !acceptedOffer) return;
+    await withLoading(async () => {
+      await api("/reviews", {
+        method: "POST",
+        body: JSON.stringify({
+          telegramId: tgUser.id,
+          name: tgUser.name,
+          requestId: request.id,
+          providerId: acceptedOffer.providerId,
+          rating: reviewForm.rating,
+          text: reviewForm.text || undefined,
+        }),
+      });
+      setSubmittedReviews((m) => ({ ...m, [request.id]: { rating: reviewForm.rating, text: reviewForm.text } }));
+      setLocallyCompletedRequestIds((s) => new Set(s).add(request.id));
+      goTab("client-my-orders");
+    });
+  }
+
+  function confirmDeleteClientAccount() {
+    setClientShowDeleteConfirm(false);
+    goHome();
   }
 
   // ---- Роль: мастер ----
@@ -639,10 +731,7 @@ export default function TbilisiMiniApp() {
   function renderClientHome() {
     return (
       <div className="tms-screen">
-        <div className="tms-section">
-          <button className="tms-link-row" onClick={openMyRequests}>Мои заявки →</button>
-        </div>
-        <div className="tms-section">
+        <div className="tms-section" style={{ marginTop: 4 }}>
           <p className="tms-section-label">Категории</p>
           {loading && <p className="muted">Загрузка…</p>}
           {error && <p className="tms-error">{error}</p>}
@@ -753,48 +842,335 @@ export default function TbilisiMiniApp() {
     );
   }
 
-  function renderClientMy() {
+  /* -------------------------- Экраны: клиент — личный кабинет -------------------------- */
+
+  // Строка отклика мастера — используется и в агрегированной вкладке «Предложения»,
+  // и внутри конкретной заявки (там showRequestLabel не нужен — контекст и так ясен).
+  function renderOfferRow(o, { showRequestLabel } = {}) {
     return (
-      <div className="tms-screen">
-        <div className="tms-section"><p className="tms-section-label">Мои заявки</p></div>
-        {loading && <p className="muted">Загрузка…</p>}
-        <div className="tms-list">
-          {myRequests.map((r) => (
-            <button key={r.id} className="tms-list-row" onClick={() => openRequestOffers(r)}>
-              <span>{r.service.name} · {r.status === "open" ? "открыта" : r.status === "matched" ? "мастер выбран" : r.status}</span>
-              <span className="tms-chevron">{r.offers.length} откл. →</span>
-            </button>
-          ))}
+      <div key={o.id} className="tms-offer-row">
+        <div className="tms-offer-top">
+          <span className="tms-provider-avatar">👤</span>
+          <div>
+            <p className="tms-provider-name">{o.provider.user.name}</p>
+            <p className="tms-provider-meta">★ {o.provider.rating.toFixed(1)}{showRequestLabel ? ` · Заявка: ${o.request.service.name}` : ""}</p>
+          </div>
+          <p className="tms-offer-terms">{o.price} ₾</p>
         </div>
-        {!loading && myRequests.length === 0 && <p className="muted">Заявок пока нет.</p>}
+        {o.comment && <p className="tms-offer-comment">«{o.comment}»</p>}
+        <div className="tms-offer-actions">
+          <button className="tms-decline-btn" onClick={() => viewProvider(o.providerId)}>Посмотреть мастера</button>
+          {o.status === "pending" ? (
+            <>
+              <button className="tms-select-btn" onClick={() => respondToOffer(o.id, "accepted")}>Выбрать</button>
+              <button className="tms-decline-btn" onClick={() => respondToOffer(o.id, "declined")}>Отказаться</button>
+            </>
+          ) : (
+            <span className="tms-provider-meta">{o.status === "accepted" ? "выбран" : "отклонён"}</span>
+          )}
+        </div>
       </div>
     );
   }
 
-  function renderClientOffers() {
+  function renderClientDashboard() {
+    const activeRequests = myRequests.filter((r) => r.status === "open");
+    const inWorkRequests = myRequests.filter((r) => r.status === "matched" && !locallyCompletedRequestIds.has(r.id));
     return (
       <div className="tms-screen">
-        <div className="tms-section"><p className="tms-section-label">Отклики</p></div>
-        {loading && <p className="muted">Загрузка…</p>}
-        <div className="tms-offer-list">
-          {selectedOffers.map((o) => (
-            <div key={o.id} className="tms-offer-row">
-              <div className="tms-offer-top">
-                <span className="tms-provider-avatar">👤</span>
-                <div><p className="tms-provider-name">{o.provider.user.name}</p><p className="tms-provider-meta">{o.status}</p></div>
-                <p className="tms-offer-terms">{o.price} ₾</p>
+        <div className="tms-hero">
+          <p className="tms-greeting">Привет</p>
+          <h1 className="tms-hero-title">{tgUser.name}</h1>
+        </div>
+        <div className="tms-stat-grid">
+          <StatCard icon="📨" label="Активная заявка" value={activeRequests.length}
+            onClick={activeRequests.length ? () => openRequestDetail(activeRequests[0]) : undefined} />
+          <StatCard icon="🟢" label="Заказы в работе" value={inWorkRequests.length}
+            onClick={() => goTab("client-my-orders")} />
+        </div>
+        <div className="tms-section">
+          <button className="tms-mainbutton" onClick={openCreateRequest}>+ Создать заявку</button>
+        </div>
+      </div>
+    );
+  }
+
+  function renderClientMyRequests() {
+    const openList = myRequests.filter((r) => r.status === "open");
+    return (
+      <div className="tms-screen">
+        <div className="tms-section" style={{ marginTop: 4 }}><p className="tms-section-label">Мои заявки</p></div>
+        <div className="tms-provider-list">
+          {openList.map((r) => (
+            <div key={r.id} className="tms-provider-row">
+              <div className="tms-provider-info" style={{ flex: 1 }}>
+                <span className="tms-provider-name">{r.description || r.service.name}</span>
+                <span className="tms-provider-meta">{r.area || "район не указан"}</span>
+                <span className="tms-provider-meta">Статус: поиск мастера</span>
+                {r.urgency && <span className="tms-provider-meta">{r.urgency}</span>}
+                {typeof r.budget === "number" && <span className="tms-provider-meta">Бюджет: до {r.budget} ₾</span>}
+                <span className="tms-provider-meta">Предложений: {r.offers.length}</span>
               </div>
-              {o.comment && <p className="tms-offer-comment">«{o.comment}»</p>}
-              {o.status === "pending" && (
-                <div className="tms-offer-actions">
-                  <button className="tms-select-btn" onClick={() => respondToOffer(o.id, "accepted")}>Выбрать</button>
-                  <button className="tms-decline-btn" onClick={() => respondToOffer(o.id, "declined")}>Отклонить</button>
-                </div>
-              )}
+              <button className="tms-select-btn" onClick={() => openRequestDetail(r)}>Открыть</button>
             </div>
           ))}
+          {openList.length === 0 && <p className="muted">Активных заявок пока нет.</p>}
         </div>
-        {!loading && selectedOffers.length === 0 && <p className="muted">Пока никто не откликнулся.</p>}
+      </div>
+    );
+  }
+
+  function renderClientRequestDetail() {
+    const r = myRequests.find((x) => x.id === selectedRequestId);
+    if (!r) return null;
+    return (
+      <div className="tms-screen">
+        <div className="tms-section" style={{ marginTop: 4 }}>
+          <p className="tms-section-label">{r.service.name}</p>
+          <p className="tms-body-text">{r.description || "Без описания"}</p>
+        </div>
+        <div className="tms-section">
+          <div className="tms-chip-wrap">
+            <span className="tms-summary-pill">{r.area || "район не указан"}</span>
+            <span className="tms-summary-pill">{r.urgency || "срочность не указана"}</span>
+            {typeof r.budget === "number" && <span className="tms-summary-pill">до {r.budget} ₾</span>}
+          </div>
+        </div>
+        <div className="tms-section">
+          <p className="tms-section-label">Статус: {r.status === "open" ? "поиск мастера" : r.status === "matched" ? "мастер выбран" : r.status}</p>
+        </div>
+        <div className="tms-section">
+          <p className="tms-section-label">Предложения ({r.offers.length})</p>
+          <div className="tms-offer-list">{r.offers.map((o) => renderOfferRow(o))}</div>
+          {r.offers.length === 0 && <p className="muted">Пока никто не откликнулся.</p>}
+        </div>
+      </div>
+    );
+  }
+
+  function renderClientOffersAll() {
+    const pending = myRequests
+      .filter((r) => r.status === "open")
+      .flatMap((r) => r.offers.filter((o) => o.status === "pending").map((o) => ({ ...o, request: r })));
+    return (
+      <div className="tms-screen">
+        <div className="tms-section" style={{ marginTop: 4 }}><p className="tms-section-label">Предложения от мастеров</p></div>
+        <div className="tms-offer-list">{pending.map((o) => renderOfferRow(o, { showRequestLabel: true }))}</div>
+        {pending.length === 0 && <p className="muted">Пока нет новых предложений.</p>}
+      </div>
+    );
+  }
+
+  function renderClientProviderView() {
+    const p = viewedProvider;
+    if (!p) return null;
+    const specialization = (p.services || []).map((s) => s.service?.name).filter(Boolean).join(", ");
+    return (
+      <div className="tms-screen">
+        <div className="tms-section" style={{ marginTop: 4 }}>
+          <div className="tms-profile-head">
+            <span className="tms-provider-avatar" style={{ fontSize: 32 }}>👤</span>
+            <div>
+              <p className="tms-provider-name" style={{ fontSize: 16 }}>{p.user.name}</p>
+              <p className="tms-provider-meta">{specialization || "Специализация не указана"}</p>
+            </div>
+            <span className={`tms-badge-verify ${p.verified ? "is-verified" : ""}`}>{p.verified ? "✅ Подтверждён" : "⏳ На проверке"}</span>
+          </div>
+          <p className="tms-provider-meta">★ {p.rating.toFixed(1)} · {p.reviewCount} отз.</p>
+        </div>
+        <div className="tms-section">
+          <p className="tms-section-label">Описание</p>
+          <p className="tms-body-text">{p.description || "Мастер пока не добавил описание."}</p>
+        </div>
+        <div className="tms-section">
+          <p className="tms-section-label">Языки</p>
+          <p className="muted">Мастер пока не указал языки в профиле.</p>
+        </div>
+      </div>
+    );
+  }
+
+  function renderClientOrderRow(r) {
+    const offer = r.offers.find((o) => o.status === "accepted");
+    return (
+      <button key={r.id} className="tms-order-card" onClick={() => openClientOrder(r)}>
+        <div className="tms-provider-info" style={{ flex: 1 }}>
+          <span className="tms-provider-name">{offer?.provider.user.name || "Мастер"}{offer ? ` · ★${offer.provider.rating.toFixed(1)}` : ""}</span>
+          <span className="tms-provider-meta">{r.service.name}{locallyCompletedRequestIds.has(r.id) ? " · Завершён" : ""}</span>
+        </div>
+        <span className="tms-offer-terms">{offer?.price ?? r.budget} ₾</span>
+        <span className="tms-chevron">→</span>
+      </button>
+    );
+  }
+
+  function renderClientMyOrders() {
+    const inWork = myRequests.filter((r) => r.status === "matched" && !locallyCompletedRequestIds.has(r.id));
+    const history = myRequests.filter((r) => r.status === "matched" && locallyCompletedRequestIds.has(r.id));
+    return (
+      <div className="tms-screen">
+        <div className="tms-section" style={{ marginTop: 4 }}>
+          <p className="tms-section-label">В работе</p>
+          <div className="tms-provider-list">
+            {inWork.map(renderClientOrderRow)}
+            {inWork.length === 0 && <p className="muted">Активных заказов пока нет.</p>}
+          </div>
+        </div>
+        <div className="tms-section">
+          <p className="tms-section-label">История</p>
+          <div className="tms-provider-list">
+            {history.map(renderClientOrderRow)}
+            {history.length === 0 && <p className="muted">Завершённых заказов пока нет.</p>}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function renderClientOrderDetail() {
+    const r = myRequests.find((x) => x.id === selectedClientOrderId);
+    if (!r) return null;
+    const offer = r.offers.find((o) => o.status === "accepted");
+    const isCompleted = locallyCompletedRequestIds.has(r.id);
+    const review = submittedReviews[r.id];
+    return (
+      <div className="tms-screen">
+        <div className="tms-section" style={{ marginTop: 4 }}>
+          <div className="tms-profile-head">
+            <span className="tms-provider-avatar" style={{ fontSize: 32 }}>👤</span>
+            <div>
+              <p className="tms-provider-name" style={{ fontSize: 16 }}>{offer?.provider.user.name || "Мастер"}</p>
+              <p className="tms-provider-meta">{r.service.name}</p>
+            </div>
+            {offer && <span className={`tms-badge-verify ${offer.provider.verified ? "is-verified" : ""}`}>{offer.provider.verified ? "✅ Подтверждён" : "⏳ На проверке"}</span>}
+          </div>
+          {offer && <p className="tms-provider-meta">★ {offer.provider.rating.toFixed(1)} · {offer.provider.reviewCount} отз.</p>}
+        </div>
+        {offer?.provider.description && (
+          <div className="tms-section">
+            <p className="tms-section-label">Описание</p>
+            <p className="tms-body-text">{offer.provider.description}</p>
+          </div>
+        )}
+        <div className="tms-section">
+          <p className="tms-section-label">Языки</p>
+          <p className="muted">Мастер пока не указал языки в профиле.</p>
+        </div>
+        <div className="tms-section">
+          <p className="tms-section-label">Стоимость</p>
+          <p className="tms-body-text">{offer?.price ?? r.budget} ₾</p>
+        </div>
+        <div className="tms-section">
+          <p className="tms-section-label">Создано</p>
+          <p className="tms-body-text">{new Date(r.createdAt).toLocaleDateString("ru-RU")}</p>
+        </div>
+        {isCompleted ? (
+          <>
+            {review && (
+              <div className="tms-section">
+                <p className="tms-section-label">Ваш отзыв</p>
+                <p className="tms-review-stars">{"★".repeat(review.rating)}{"☆".repeat(5 - review.rating)}</p>
+                {review.text && <p className="tms-body-text">«{review.text}»</p>}
+              </div>
+            )}
+            <div className="tms-section">
+              <button className="tms-select-btn" style={{ width: "100%", padding: "12px" }} onClick={openCreateRequest}>Создать ещё заявку</button>
+            </div>
+          </>
+        ) : (
+          <div className="tms-section">
+            <button className="tms-select-btn" style={{ width: "100%", padding: "12px" }} onClick={() => startReview(r)}>Завершить заказ</button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function renderClientReview() {
+    const r = myRequests.find((x) => x.id === reviewTargetRequestId);
+    if (!r) return null;
+    const offer = r.offers.find((o) => o.status === "accepted");
+    return (
+      <div className="tms-screen">
+        <div className="tms-section" style={{ marginTop: 4 }}>
+          <p className="tms-section-label">Оцените мастера</p>
+          <p className="muted">{offer?.provider.user.name} · {r.service.name}</p>
+        </div>
+        <div className="tms-section">
+          <StarPicker value={reviewForm.rating} onChange={(rating) => setReviewForm((f) => ({ ...f, rating }))} />
+        </div>
+        <div className="tms-section">
+          <p className="tms-section-label">Комментарий (необязательно)</p>
+          <textarea className="tms-textarea" rows={3} placeholder="Что понравилось или что можно улучшить"
+            value={reviewForm.text} onChange={(e) => setReviewForm((f) => ({ ...f, text: e.target.value }))} />
+        </div>
+        {error && <p className="tms-error">{error}</p>}
+      </div>
+    );
+  }
+
+  function renderClientProfile() {
+    return (
+      <div className="tms-screen">
+        <div className="tms-section" style={{ marginTop: 4 }}>
+          <p className="tms-section-label">Аккаунт</p>
+          <div className="tms-profile-card">
+            <div className="tms-profile-head">
+              {tgUser.photoUrl ? (
+                <img className="tms-avatar-img" src={tgUser.photoUrl} alt="" />
+              ) : (
+                <span className="tms-provider-avatar" style={{ fontSize: 32 }}>👤</span>
+              )}
+              <div>
+                <p className="tms-provider-name" style={{ fontSize: 16 }}>{tgUser.name}</p>
+                {tgUser.username && <p className="tms-provider-meta">@{tgUser.username}</p>}
+              </div>
+            </div>
+            <div className="tms-field-group">
+              <label className="tms-field"><span>Имя</span><input className="tms-field-input"
+                value={clientSettingsForm.name} onChange={(e) => setClientSettingsForm((f) => ({ ...f, name: e.target.value }))} /></label>
+              <label className="tms-field"><span>Телефон</span><input className="tms-field-input" placeholder="+995 5xx xx xx xx"
+                value={clientSettingsForm.phone} onChange={(e) => setClientSettingsForm((f) => ({ ...f, phone: e.target.value }))} /></label>
+              <label className="tms-field"><span>Email</span><input className="tms-field-input" placeholder="mail@example.com"
+                value={clientSettingsForm.email} onChange={(e) => setClientSettingsForm((f) => ({ ...f, email: e.target.value }))} /></label>
+            </div>
+          </div>
+        </div>
+
+        <div className="tms-section">
+          <p className="tms-section-label">Уведомления</p>
+          <div className="tms-profile-card">
+            <Toggle checked={clientSettingsForm.notifyOrders} onChange={(v) => setClientSettingsForm((f) => ({ ...f, notifyOrders: v }))} label="Заявки взяты в работу" />
+            <Toggle checked={clientSettingsForm.notifyChat} onChange={(v) => setClientSettingsForm((f) => ({ ...f, notifyChat: v }))} label="Чат с мастерами" />
+          </div>
+        </div>
+
+        <div className="tms-section">
+          <p className="tms-section-label">Язык приложения</p>
+          <div className="tms-chip-wrap">
+            {APP_LANGUAGES.map((l) => <Chip key={l} label={l} active={clientSettingsForm.appLanguage === l} onClick={() => setClientSettingsForm((f) => ({ ...f, appLanguage: l }))} />)}
+          </div>
+        </div>
+
+        <div className="tms-section">
+          <p className="tms-section-label">Поддержка</p>
+          <button className="tms-link-row" onClick={() => navigate("client-support")}>Написать в поддержку →</button>
+        </div>
+
+        <div className="tms-section">
+          <p className="tms-section-label">Опасная зона</p>
+          {!clientShowDeleteConfirm ? (
+            <button className="tms-decline-btn" onClick={() => setClientShowDeleteConfirm(true)}>Удалить аккаунт</button>
+          ) : (
+            <div className="tms-profile-card">
+              <p className="tms-body-text">Все ваши заявки и отзывы будут удалены безвозвратно. Продолжить?</p>
+              <div className="tms-offer-actions">
+                <button className="tms-decline-btn" onClick={confirmDeleteClientAccount}>Да, удалить</button>
+                <button className="tms-select-btn" onClick={() => setClientShowDeleteConfirm(false)}>Отмена</button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     );
   }
@@ -1300,7 +1676,7 @@ export default function TbilisiMiniApp() {
     );
   }
 
-  function renderProviderSupport() {
+  function renderSupportChat() {
     return (
       <div className="tms-screen" style={{ paddingBottom: 8 }}>
         <div className="tms-section" style={{ marginTop: 0 }}>
@@ -1318,8 +1694,16 @@ export default function TbilisiMiniApp() {
       case "client-services": return renderClientServices();
       case "client-request": return renderClientRequest();
       case "client-matches": return renderClientMatches();
-      case "client-my": return renderClientMy();
-      case "client-offers": return renderClientOffers();
+      case "client-dashboard": return renderClientDashboard();
+      case "client-my-requests": return renderClientMyRequests();
+      case "client-request-detail": return renderClientRequestDetail();
+      case "client-offers-all": return renderClientOffersAll();
+      case "client-provider-view": return renderClientProviderView();
+      case "client-my-orders": return renderClientMyOrders();
+      case "client-order-detail": return renderClientOrderDetail();
+      case "client-review": return renderClientReview();
+      case "client-profile": return renderClientProfile();
+      case "client-support": return renderSupportChat();
       case "provider-register": return renderProviderRegister();
       case "provider-dashboard": return renderProviderDashboard();
       case "provider-requests": return renderProviderRequests();
@@ -1335,7 +1719,7 @@ export default function TbilisiMiniApp() {
       case "provider-finance": return renderProviderFinance();
       case "provider-subscription": return renderProviderSubscription();
       case "provider-settings": return renderProviderSettings();
-      case "provider-support": return renderProviderSupport();
+      case "provider-support": return renderSupportChat();
       default: return null;
     }
   }
@@ -1346,8 +1730,16 @@ export default function TbilisiMiniApp() {
     "client-services": "Выбор услуги",
     "client-request": "Новая заявка",
     "client-matches": "Подходящие мастера",
-    "client-my": "Мои заявки",
-    "client-offers": "Отклики",
+    "client-dashboard": "Личный кабинет",
+    "client-my-requests": "Мои заявки",
+    "client-request-detail": "Заявка",
+    "client-offers-all": "Предложения",
+    "client-provider-view": "Мастер",
+    "client-my-orders": "Мои заказы",
+    "client-order-detail": "Заказ",
+    "client-review": "Отзыв о мастере",
+    "client-profile": "Профиль",
+    "client-support": "Поддержка",
     "provider-register": "Регистрация мастера",
     "provider-dashboard": "Личный кабинет",
     "provider-requests": "Заявки",
@@ -1370,6 +1762,10 @@ export default function TbilisiMiniApp() {
     switch (screen) {
       case "client-request":
         return { label: loading ? "Отправляю…" : "Отправить заявку", disabled: loading || !(form.district && form.urgency), onClick: submitRequest };
+      case "client-matches":
+        return { label: "Готово", disabled: false, onClick: () => goTab("client-dashboard") };
+      case "client-review":
+        return { label: loading ? "Сохраняю…" : "Оставить отзыв и завершить", disabled: loading, onClick: submitReview };
       case "provider-register": {
         let hint;
         if (providerForm.serviceIds.length === 0) hint = "Выберите хотя бы одну услугу";
@@ -1388,20 +1784,28 @@ export default function TbilisiMiniApp() {
 
   const bb = bottomBarConfig() || {};
   // Экран профиля мастера использует ту же вкладку "Профиль" в таб-баре, но переход
-  // на неё должен подгружать список услуг — используем отдельный обработчик клика таб-бара.
+  // на неё должен подгружать список услуг; клиентские вкладки при каждом заходе
+  // тихо обновляют список заявок/предложений — используем общий обработчик клика.
   function handleTabNavigate(key) {
-    if (key === "provider-profile-cabinet") openProfileTab();
-    else goTab(key);
+    if (key === "provider-profile-cabinet") {
+      openProfileTab();
+      return;
+    }
+    goTab(key);
+    if (key.startsWith("client-") && key !== "client-profile") {
+      loadMyRequests().catch((e) => setError(e.message));
+    }
   }
   const showBack = history.length > 0;
 
   let bottomArea = null;
   if (screen === "provider-chat") {
     bottomArea = <ChatInputBar value={chatDraft} onChange={setChatDraft} onSend={sendChatMessage} />;
-  } else if (screen === "provider-support") {
+  } else if (screen === "provider-support" || screen === "client-support") {
     bottomArea = <ChatInputBar value={supportDraft} onChange={setSupportDraft} onSend={sendSupportMessage} />;
   } else if (TAB_BAR_SCREENS.has(screen)) {
-    bottomArea = <ProviderTabBar active={screen} onNavigate={handleTabNavigate} />;
+    const tabs = screen.startsWith("client-") ? CLIENT_TABS : PROVIDER_TABS;
+    bottomArea = <TabBar items={tabs} active={screen} onNavigate={handleTabNavigate} />;
   } else if (bb.label) {
     bottomArea = <BottomBar label={bb.label} disabled={bb.disabled} onClick={bb.onClick} hint={bb.hint} />;
   }
@@ -1558,6 +1962,8 @@ export default function TbilisiMiniApp() {
         .tms-chatbar-input { flex: 1; border: 1px solid var(--line); border-radius: 20px; padding: 10px 14px; font-size: 13.5px; background: var(--card); color: var(--ink); }
         .tms-chatbar-send { width: 38px; height: 38px; border-radius: 50%; border: none; background: var(--ink); color: var(--paper); cursor: pointer; flex-shrink: 0; }
         .tms-chatbar-send:disabled { background: var(--line); color: var(--muted); }
+        .tms-starpicker { display: flex; gap: 6px; }
+        .tms-starpicker-btn { border: none; background: transparent; font-size: 32px; line-height: 1; padding: 0; cursor: pointer; color: #D9A441; }
       `}</style>
       <div className="tms-phone">
         <Header title={TITLES[screen]} onBack={showBack ? goBack : null} onClose={goHome} />
