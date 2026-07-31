@@ -1409,13 +1409,21 @@ export default function TbilisiMiniApp() {
   return (
     <div className="tms-root">
       <style>{`
+        html, body { margin: 0; padding: 0; height: 100%; }
         .tms-root {
           --ink: #14161A; --paper: #F6F5F2; --card: #FFFFFF; --accent: #1F6F5C; --line: #E4E2DC; --muted: #86847C;
           font-family: 'Inter', -apple-system, sans-serif; color: var(--ink);
-          display: flex; justify-content: center; padding: 24px 0;
+          display: flex; justify-content: center; align-items: center;
+          min-height: 100dvh; padding: 24px 0;
         }
         .tms-root * { box-sizing: border-box; }
-        .tms-phone { width: 380px; max-width: 100%; height: 740px; background: var(--paper); border-radius: 28px; border: 1px solid var(--line); box-shadow: 0 24px 48px -24px rgba(20,22,26,0.35); display: flex; flex-direction: column; overflow: hidden; position: relative; }
+        .tms-phone { width: 380px; max-width: 100%; height: 740px; max-height: 100dvh; background: var(--paper); border-radius: 28px; border: 1px solid var(--line); box-shadow: 0 24px 48px -24px rgba(20,22,26,0.35); display: flex; flex-direction: column; overflow: hidden; position: relative; }
+        /* На реальном мобильном экране (Telegram Mini App) декоративная рамка
+           «телефона» не нужна — приложение растягивается на весь вьюпорт. */
+        @media (max-width: 480px) {
+          .tms-root { padding: 0; min-height: 100dvh; height: 100dvh; }
+          .tms-phone { width: 100%; height: 100dvh; max-height: none; border-radius: 0; border: none; box-shadow: none; }
+        }
         .tms-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 16px; background: var(--paper); border-bottom: 1px solid var(--line); flex-shrink: 0; }
         .tms-header-btn { width: 26px; height: 26px; border-radius: 8px; border: none; background: transparent; color: var(--muted); font-size: 15px; cursor: pointer; }
         .tms-header-spacer { width: 26px; }
