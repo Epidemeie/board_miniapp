@@ -5,7 +5,6 @@ const API_BASE = import.meta.env.DEV ? "http://localhost:3000/api" : "https://ap
 const DISTRICTS = ["Ваке", "Сабуртало", "Мтацминда", "Дидубе", "Глдани", "Исани", "Самгори", "Чугурети", "Крцаниси", "Надзаладеви"];
 const URGENCY_OPTIONS = ["Срочно, сегодня", "Завтра", "На этой неделе", "Не срочно"];
 const LANGUAGE_OPTIONS = ["Русский", "Английский", "Грузинский"];
-const APP_LANGUAGES = ["Русский", "Английский"];
 
 const FACTOR_LABELS = {
   service: "Совпадение по услуге",
@@ -16,6 +15,264 @@ const FACTOR_LABELS = {
   speed: "Скорость ответа",
 };
 const FACTOR_WEIGHTS = { service: 30, distance: 20, price: 15, rating: 15, reviews: 10, speed: 10 };
+
+const STATUS_LABELS = {
+  open: "поиск мастера",
+  matched: "мастер выбран",
+  completed: "завершена",
+  cancelled: "отменена",
+};
+
+/* ---------------------------------------------------------------
+   Локализация. t(s) ищет русскую строку-ключ в словаре и возвращает
+   английский перевод, если выбран английский язык, иначе — саму
+   строку без изменений. Контент из базы (названия услуг/районов,
+   которые вводит админ, описания мастеров, тексты отзывов) не
+   переводится — это ограничение MVP, а не баг.
+--------------------------------------------------------------- */
+
+const RU_TO_EN = {
+  // Общее
+  "Русский": "Russian",
+  "Английский": "English",
+  "Грузинский": "Georgian",
+  "Назад": "Back",
+  "Начать заново": "Start over",
+  "Отправить": "Send",
+  "Написать сообщение…": "Write a message…",
+  "Сообщений пока нет.": "No messages yet.",
+  "звёзд": "stars",
+  "Загрузка…": "Loading…",
+  "Открыть": "Open",
+  "Отмена": "Cancel",
+  "Готово": "Done",
+  "Имя": "Name",
+  "Телефон": "Phone",
+  "Email": "Email",
+  "Описание": "Description",
+  "Языки": "Languages",
+  "Поддержка": "Support",
+  "Написать в поддержку →": "Contact support →",
+  "Опасная зона": "Danger zone",
+  "Удалить аккаунт": "Delete account",
+  "Да, удалить": "Yes, delete",
+  "Уведомления": "Notifications",
+  "Аккаунт": "Account",
+  "район не указан": "area not specified",
+  "не указан": "not specified",
+  "Без описания": "No description",
+  "Пользователь": "User",
+  "Гость": "Guest",
+  "Другое": "Other",
+  // Районы (Тбилиси — переведены транслитерацией)
+  "Ваке": "Vake",
+  "Сабуртало": "Saburtalo",
+  "Мтацминда": "Mtatsminda",
+  "Дидубе": "Didube",
+  "Глдани": "Gldani",
+  "Исани": "Isani",
+  "Самгори": "Samgori",
+  "Чугурети": "Chughureti",
+  "Крцаниси": "Krtsanisi",
+  "Надзаладеви": "Nadzaladevi",
+  // Срочность
+  "Срочно, сегодня": "Urgent, today",
+  "Завтра": "Tomorrow",
+  "На этой неделе": "This week",
+  "Не срочно": "Not urgent",
+  // Статусы заявок
+  "поиск мастера": "looking for a pro",
+  "мастер выбран": "pro selected",
+  "завершена": "completed",
+  "отменена": "cancelled",
+  "в архиве": "archived",
+  // Язык-скрин
+  "Выберите язык": "Choose language",
+  "Язык приложения": "App language",
+  // Таб-бар / общие разделы
+  "Главная": "Home",
+  "Заявки": "Requests",
+  "Заказы": "Orders",
+  "Профиль": "Profile",
+  "Ещё": "More",
+  "Предложения": "Offers",
+  // Роль
+  ", привет": ", hi",
+  "Вы клиент или мастер?": "Are you a client or a pro?",
+  "Я клиент": "I'm a client",
+  "Ищу мастера для задачи": "Looking for a pro for a task",
+  "Я мастер": "I'm a pro",
+  "Хочу получать заявки": "Want to receive requests",
+  // Клиент: создание заявки
+  "Категории": "Categories",
+  "Категорий пока нет — загляните позже.": "No categories yet — check back later.",
+  "Услуга": "Service",
+  "Опишите задачу": "Describe the task",
+  "Район": "Area",
+  "Срочность": "Urgency",
+  "Бюджет": "Budget",
+  "Выберите район и срочность, чтобы продолжить": "Choose an area and urgency to continue",
+  "Заявка отправлена": "Request sent",
+  "Эти мастера подходят под вашу задачу и могут откликнуться:": "These pros match your task and can respond:",
+  "отз.": "rev.",
+  "Подходящих мастеров пока нет — загляните позже в «Мои заявки».": "No matching pros yet — check «My requests» later.",
+  // Отклик мастера (карточка)
+  "Заявка": "Request",
+  "Посмотреть мастера": "View pro",
+  "Выбрать": "Select",
+  "Отказаться": "Decline",
+  "выбран": "selected",
+  "отклонён": "declined",
+  // Клиент: кабинет
+  "Привет": "Hi",
+  "Активная заявка": "Active request",
+  "Заказы в работе": "Orders in progress",
+  "+ Создать заявку": "+ Create request",
+  "Мои заявки": "My requests",
+  "Статус: поиск мастера": "Status: looking for a pro",
+  "Бюджет: до": "Budget: up to",
+  "Предложений": "Offers",
+  "Активных заявок пока нет.": "No active requests yet.",
+  "Архив заявок": "Archived requests",
+  "· удалена": "· deleted",
+  "срочность не указана": "urgency not specified",
+  "Статус": "Status",
+  "Заявка удалена и перенесена в архив — не участвует в статистике и не видна мастерам.": "The request was deleted and moved to the archive — it doesn't affect stats and isn't visible to pros.",
+  "Пока никто не откликнулся.": "No one has responded yet.",
+  "Удалить заявку": "Delete request",
+  "Предложения от мастеров": "Offers from pros",
+  "Пока нет новых предложений.": "No new offers yet.",
+  "Специализация не указана": "Specialization not specified",
+  "✅ Подтверждён": "✅ Verified",
+  "⏳ На проверке": "⏳ Under review",
+  "Мастер пока не добавил описание.": "The pro hasn't added a description yet.",
+  "Мастер пока не указал языки в профиле.": "The pro hasn't listed languages in their profile yet.",
+  "Мастер": "Pro",
+  "· Завершён": "· Completed",
+  "В работе": "In progress",
+  "Активных заказов пока нет.": "No active orders yet.",
+  "История": "History",
+  "Завершённых заказов пока нет.": "No completed orders yet.",
+  "Стоимость": "Cost",
+  "Создано": "Created",
+  "Ваш отзыв": "Your review",
+  "Создать ещё заявку": "Create another request",
+  "Завершить заказ": "Complete order",
+  "Оцените мастера": "Rate the pro",
+  "Комментарий (необязательно)": "Comment (optional)",
+  "Что понравилось или что можно улучшить": "What you liked or what could be better",
+  // Профиль клиента
+  "Заявки взяты в работу": "Requests taken into work",
+  "Чат с мастерами": "Chat with pros",
+  "Все ваши заявки и отзывы будут удалены безвозвратно. Продолжить?": "All your requests and reviews will be permanently deleted. Continue?",
+  // Регистрация мастера
+  "Какие услуги оказываете": "Which services do you provide",
+  "Можно выбрать несколько": "You can select several",
+  "Районы работы": "Work areas",
+  "— выберите хотя бы один, иначе анкету не отправить": "— select at least one, otherwise the form can't be submitted",
+  "Цена от (₾)": "Price from (₾)",
+  "О себе": "About you",
+  "Опыт, специализация": "Experience, specialization",
+  "Ваша цена (₾)": "Your price (₾)",
+  "Комментарий": "Comment",
+  "Когда сможете приехать, что учли": "When you can arrive, what you factored in",
+  // Кабинет мастера
+  "Сегодня": "Today",
+  "Новых заявок": "New requests",
+  "Рейтинг": "Rating",
+  "Чаты с клиентами": "Chats with clients",
+  "Доход за месяц": "Income this month",
+  "Конверсия": "Conversion",
+  "заявок": "requests",
+  "обработано": "processed",
+  "заказов": "orders",
+  "конверсия": "conversion",
+  "Новые": "New",
+  "Завершённые": "Completed",
+  "Отклонённые": "Declined",
+  "Ждём ответа клиента": "Waiting for client response",
+  "Клиент отклонил ваш отклик": "Client declined your offer",
+  "Вы отказались от заявки": "You declined the request",
+  "Здесь пока пусто.": "Nothing here yet.",
+  "Взять в работу": "Take the job",
+  "Подтверждённые": "Confirmed",
+  "Отменённые": "Cancelled",
+  "Описание работы": "Job description",
+  "Клиент": "Client",
+  "username не указан": "no username",
+  "Адрес / район": "Address / area",
+  "Сумма работы": "Job amount",
+  "💬 Написать в Telegram": "💬 Message on Telegram",
+  "Клиент не указал username в Telegram — свяжитесь через заявку.": "The client hasn't set a Telegram username — get in touch via the request.",
+  "Клиенты по активным заказам": "Clients from active orders",
+  "Основная информация": "Basic information",
+  "Категория не выбрана": "No category selected",
+  "Расскажите об опыте и специализации": "Tell us about your experience and specialization",
+  "Контакты": "Contacts",
+  "Скрывать контакты от клиентов": "Hide contacts from clients",
+  "Клиент увидит контакты только после подтверждения заказа": "The client will see your contacts only after the order is confirmed",
+  "География — работаю": "Areas — I work in",
+  "Услуги": "Services",
+  "Загрузка списка услуг…": "Loading services list…",
+  "Цены": "Prices",
+  "Выезд, ₾": "Callout, ₾",
+  "Минимальный заказ, ₾": "Minimum order, ₾",
+  "Почасовая ставка, ₾": "Hourly rate, ₾",
+  "Аналитика": "Analytics",
+  "Отзывы": "Reviews",
+  "Финансы": "Finance",
+  "Подписка": "Subscription",
+  "Настройки": "Settings",
+  "Получено заявок": "Requests received",
+  "Обработано": "Processed",
+  "Выбрали (заказы)": "Chosen (orders)",
+  "Повторные клиенты": "Repeat clients",
+  "отзывов": "reviews",
+  "Последние отзывы": "Latest reviews",
+  "Отзывов пока нет.": "No reviews yet.",
+  "Показать все отзывы →": "Show all reviews →",
+  "Раздел в разработке — сумма и история уже реальные, оформление появится позже": "Section in development — the amount and history are already real, the design will follow",
+  "Баланс": "Balance",
+  "История операций": "Transaction history",
+  "заявка №": "request #",
+  "Раздел в разработке": "Section in development",
+  "Подписка появится позже": "Subscription coming later",
+  "Как только определимся с моделью монетизации — здесь можно будет выбрать тариф и продвижение анкеты.": "Once we settle on a monetization model, you'll be able to choose a plan and promote your profile here.",
+  "Новые заявки": "New requests",
+  "Новые отзывы": "New reviews",
+  "Действия по заказам": "Order actions",
+  "Уведомления от Telegram-бота — донастроим отдельно.": "Telegram bot notifications — will be configured separately.",
+  "Все данные анкеты, заявки и отзывы будут удалены безвозвратно. Продолжить?": "All profile data, requests and reviews will be permanently deleted. Continue?",
+  "Опишите проблему или предложение — сообщение придёт в поддержку.": "Describe a problem or a suggestion — the message will reach support.",
+  // Заголовки экранов
+  "Заказ": "Order",
+  "Мастера · Тбилиси": "Pros · Tbilisi",
+  "Выбор услуги": "Choose service",
+  "Новая заявка": "New request",
+  "Подходящие мастера": "Matching pros",
+  "Личный кабинет": "Dashboard",
+  "Мои заказы": "My orders",
+  "Отзыв о мастере": "Review the pro",
+  "Регистрация мастера": "Pro registration",
+  "Сообщения": "Messages",
+  "Ваш отклик": "Your offer",
+  "Все отзывы": "All reviews",
+  // Кнопки нижней панели / состояния
+  "Отправляю…": "Sending…",
+  "Отправить заявку": "Send request",
+  "Сохраняю…": "Saving…",
+  "Оставить отзыв и завершить": "Leave a review and complete",
+  "Отправить отклик": "Send offer",
+  "Выберите хотя бы одну услугу": "Select at least one service",
+  "Выберите хотя бы один район работы": "Select at least one work area",
+  "Регистрирую…": "Registering…",
+  "Зарегистрироваться": "Register",
+  // Факторы подбора
+  "Совпадение по услуге": "Service match",
+  "Расстояние": "Distance",
+  "Цена": "Price",
+  "Скорость ответа": "Response speed",
+};
 
 const TAB_BAR_SCREENS = new Set([
   "provider-dashboard", "provider-requests", "provider-orders", "provider-profile-cabinet", "provider-more",
@@ -60,13 +317,13 @@ async function api(path, options = {}) {
   return res.status === 204 ? null : res.json();
 }
 
-function groupServicesByCategory(list) {
+function groupServicesByCategory(list, t = (s) => s) {
   const groups = [];
   const byCat = {};
   for (const s of list) {
     const catId = s.category?.id ?? 0;
     if (!byCat[catId]) {
-      byCat[catId] = { id: catId, name: s.category?.name || "Другое", icon: s.category?.icon || "", items: [] };
+      byCat[catId] = { id: catId, name: s.category?.name || t("Другое"), icon: s.category?.icon || "", items: [] };
       groups.push(byCat[catId]);
     }
     byCat[catId].items.push(s);
@@ -103,12 +360,12 @@ function MatchRing({ score, size = 44, stroke = 4 }) {
   );
 }
 
-function Header({ title, onBack, onClose }) {
+function Header({ title, onBack, onClose, t = (s) => s }) {
   return (
     <div className="tms-header">
-      {onBack ? <button className="tms-header-btn" onClick={onBack} aria-label="Назад">←</button> : <span className="tms-header-spacer" />}
+      {onBack ? <button className="tms-header-btn" onClick={onBack} aria-label={t("Назад")}>←</button> : <span className="tms-header-spacer" />}
       <span className="tms-header-title">{title}</span>
-      <button className="tms-header-btn" onClick={onClose} aria-label="Начать заново">✕</button>
+      <button className="tms-header-btn" onClick={onClose} aria-label={t("Начать заново")}>✕</button>
     </div>
   );
 }
@@ -206,7 +463,7 @@ function ReviewRow({ review }) {
   );
 }
 
-function ChatThread({ messages }) {
+function ChatThread({ messages, t = (s) => s }) {
   return (
     <div className="tms-chat-thread">
       {messages.map((m, i) => (
@@ -215,16 +472,16 @@ function ChatThread({ messages }) {
           <span className="tms-chat-time">{m.time}</span>
         </div>
       ))}
-      {messages.length === 0 && <p className="muted">Сообщений пока нет.</p>}
+      {messages.length === 0 && <p className="muted">{t("Сообщений пока нет.")}</p>}
     </div>
   );
 }
 
-function StarPicker({ value, onChange }) {
+function StarPicker({ value, onChange, t = (s) => s }) {
   return (
     <div className="tms-starpicker">
       {[1, 2, 3, 4, 5].map((n) => (
-        <button key={n} type="button" className="tms-starpicker-btn" onClick={() => onChange(n)} aria-label={`${n} звёзд`}>
+        <button key={n} type="button" className="tms-starpicker-btn" onClick={() => onChange(n)} aria-label={`${n} ${t("звёзд")}`}>
           {n <= value ? "★" : "☆"}
         </button>
       ))}
@@ -232,12 +489,12 @@ function StarPicker({ value, onChange }) {
   );
 }
 
-function ChatInputBar({ value, onChange, onSend }) {
+function ChatInputBar({ value, onChange, onSend, t = (s) => s }) {
   return (
     <div className="tms-chatbar">
-      <input className="tms-chatbar-input" placeholder="Написать сообщение…" value={value}
+      <input className="tms-chatbar-input" placeholder={t("Написать сообщение…")} value={value}
         onChange={(e) => onChange(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") onSend(); }} />
-      <button className="tms-chatbar-send" onClick={onSend} disabled={!value.trim()} aria-label="Отправить">➤</button>
+      <button className="tms-chatbar-send" onClick={onSend} disabled={!value.trim()} aria-label={t("Отправить")}>➤</button>
     </div>
   );
 }
@@ -249,8 +506,15 @@ function ChatInputBar({ value, onChange, onSend }) {
 export default function TbilisiMiniApp() {
   const tgUser = useMemo(getTelegramUser, []);
 
+  // Язык выбирается на отдельном экране при каждом открытии приложения
+  // (см. renderLanguage); последний выбор запоминается только для того,
+  // чтобы подсветить его при следующем открытии, а не чтобы пропустить экран.
+  const [language, setLanguage] = useState(() => localStorage.getItem("app_language") || "ru");
+  const t = (s) => (language === "en" ? RU_TO_EN[s] ?? s : s);
+  const locale = language === "en" ? "en-GB" : "ru-RU";
+
   const [history, setHistory] = useState([]);
-  const [screen, setScreen] = useState("role");
+  const [screen, setScreen] = useState("language");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -279,7 +543,6 @@ export default function TbilisiMiniApp() {
     email: "",
     notifyOrders: true,
     notifyChat: true,
-    appLanguage: "Русский",
   });
   const [clientShowDeleteConfirm, setClientShowDeleteConfirm] = useState(false);
 
@@ -315,7 +578,6 @@ export default function TbilisiMiniApp() {
     notifyReviews: true,
     notifyOrders: true,
     notifyChat: true,
-    appLanguage: "Русский",
   });
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [supportMessages, setSupportMessages] = useState([]);
@@ -344,6 +606,14 @@ export default function TbilisiMiniApp() {
     setError(null);
     setHistory([]);
     setScreen(next);
+  }
+
+  function chooseLanguage(lang) {
+    setLanguage(lang);
+    localStorage.setItem("app_language", lang);
+    setHistory([]);
+    setError(null);
+    setScreen("role");
   }
 
   async function withLoading(fn) {
@@ -673,25 +943,45 @@ export default function TbilisiMiniApp() {
     goHome();
   }
 
+  function renderLanguage() {
+    return (
+      <div className="tms-screen">
+        <div className="tms-hero">
+          <h1 className="tms-hero-title">{t("Выберите язык")}</h1>
+        </div>
+        <div className="tms-role-grid">
+          <button className="tms-role-card" onClick={() => chooseLanguage("ru")}>
+            <span className="tms-role-emoji">🇷🇺</span>
+            <span className="tms-role-title">Русский</span>
+          </button>
+          <button className="tms-role-card" onClick={() => chooseLanguage("en")}>
+            <span className="tms-role-emoji">🇬🇧</span>
+            <span className="tms-role-title">English</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   /* -------------------------- Экраны: клиент (без изменений) -------------------------- */
 
   function renderRole() {
     return (
       <div className="tms-screen">
         <div className="tms-hero">
-          <p className="tms-greeting">{tgUser.name}, привет</p>
-          <h1 className="tms-hero-title">Вы клиент или мастер?</h1>
+          <p className="tms-greeting">{tgUser.name}{t(", привет")}</p>
+          <h1 className="tms-hero-title">{t("Вы клиент или мастер?")}</h1>
         </div>
         <div className="tms-role-grid">
           <button className="tms-role-card" onClick={chooseClient}>
             <span className="tms-role-emoji">🔍</span>
-            <span className="tms-role-title">Я клиент</span>
-            <span className="tms-role-sub">Ищу мастера для задачи</span>
+            <span className="tms-role-title">{t("Я клиент")}</span>
+            <span className="tms-role-sub">{t("Ищу мастера для задачи")}</span>
           </button>
           <button className="tms-role-card" onClick={chooseProvider}>
             <span className="tms-role-emoji">🛠️</span>
-            <span className="tms-role-title">Я мастер</span>
-            <span className="tms-role-sub">Хочу получать заявки</span>
+            <span className="tms-role-title">{t("Я мастер")}</span>
+            <span className="tms-role-sub">{t("Хочу получать заявки")}</span>
           </button>
         </div>
         {error && <p className="tms-error">{error}</p>}
@@ -703,8 +993,8 @@ export default function TbilisiMiniApp() {
     return (
       <div className="tms-screen">
         <div className="tms-section" style={{ marginTop: 4 }}>
-          <p className="tms-section-label">Категории</p>
-          {loading && <p className="muted">Загрузка…</p>}
+          <p className="tms-section-label">{t("Категории")}</p>
+          {loading && <p className="muted">{t("Загрузка…")}</p>}
           {error && <p className="tms-error">{error}</p>}
           <div className="tms-cat-grid">
             {categories.map((cat) => (
@@ -715,7 +1005,7 @@ export default function TbilisiMiniApp() {
             ))}
           </div>
           {!loading && categories.length === 0 && !error && (
-            <p className="muted">Категорий пока нет — загляните позже.</p>
+            <p className="muted">{t("Категорий пока нет — загляните позже.")}</p>
           )}
         </div>
       </div>
@@ -727,7 +1017,7 @@ export default function TbilisiMiniApp() {
       <div className="tms-screen">
         <div className="tms-section">
           <p className="tms-section-label">{form.categoryName}</p>
-          {loading && <p className="muted">Загрузка…</p>}
+          {loading && <p className="muted">{t("Загрузка…")}</p>}
           <div className="tms-list">
             {services.map((s) => (
               <button key={s.id} className="tms-list-row" onClick={() => pickService(s)}>
@@ -745,33 +1035,33 @@ export default function TbilisiMiniApp() {
     return (
       <div className="tms-screen">
         <div className="tms-section">
-          <p className="tms-section-label">Услуга</p>
+          <p className="tms-section-label">{t("Услуга")}</p>
           <div className="tms-summary-pill">{form.categoryName} · {form.serviceName}</div>
         </div>
         <div className="tms-section">
-          <p className="tms-section-label">Описание</p>
-          <textarea className="tms-textarea" rows={2} placeholder="Опишите задачу"
+          <p className="tms-section-label">{t("Описание")}</p>
+          <textarea className="tms-textarea" rows={2} placeholder={t("Опишите задачу")}
             value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
         </div>
         <div className="tms-section">
-          <p className="tms-section-label">Район</p>
+          <p className="tms-section-label">{t("Район")}</p>
           <div className="tms-chip-wrap">
-            {DISTRICTS.map((d) => <Chip key={d} label={d} active={form.district === d} onClick={() => setForm((f) => ({ ...f, district: d }))} />)}
+            {DISTRICTS.map((d) => <Chip key={d} label={t(d)} active={form.district === d} onClick={() => setForm((f) => ({ ...f, district: d }))} />)}
           </div>
         </div>
         <div className="tms-section">
-          <p className="tms-section-label">Срочность</p>
+          <p className="tms-section-label">{t("Срочность")}</p>
           <div className="tms-chip-wrap">
-            {URGENCY_OPTIONS.map((u) => <Chip key={u} label={u} active={form.urgency === u} onClick={() => setForm((f) => ({ ...f, urgency: u }))} />)}
+            {URGENCY_OPTIONS.map((u) => <Chip key={u} label={t(u)} active={form.urgency === u} onClick={() => setForm((f) => ({ ...f, urgency: u }))} />)}
           </div>
         </div>
         <div className="tms-section">
-          <p className="tms-section-label">Бюджет — до {form.budget} ₾</p>
+          <p className="tms-section-label">{t("Бюджет")} — {language === "en" ? "up to" : "до"} {form.budget} ₾</p>
           <input type="range" min={20} max={300} step={5} value={form.budget}
             onChange={(e) => setForm((f) => ({ ...f, budget: Number(e.target.value) }))} className="tms-range" />
         </div>
         {error && <p className="tms-error">{error}</p>}
-        {!ready && <p className="muted">Выберите район и срочность, чтобы продолжить</p>}
+        {!ready && <p className="muted">{t("Выберите район и срочность, чтобы продолжить")}</p>}
       </div>
     );
   }
@@ -780,8 +1070,8 @@ export default function TbilisiMiniApp() {
     return (
       <div className="tms-screen">
         <div className="tms-section">
-          <p className="tms-section-label">Заявка отправлена</p>
-          <p className="muted">Эти мастера подходят под вашу задачу и могут откликнуться:</p>
+          <p className="tms-section-label">{t("Заявка отправлена")}</p>
+          <p className="muted">{t("Эти мастера подходят под вашу задачу и могут откликнуться:")}</p>
         </div>
         <div className="tms-provider-list">
           {candidates.map(({ provider: p, overall, breakdown }) => (
@@ -790,7 +1080,7 @@ export default function TbilisiMiniApp() {
                 <span className="tms-provider-avatar">👤</span>
                 <span className="tms-provider-info">
                   <span className="tms-provider-name">{p.user.name}</span>
-                  <span className="tms-provider-meta">{p.rating.toFixed(1)} · {p.reviewCount} отз.</span>
+                  <span className="tms-provider-meta">{p.rating.toFixed(1)} · {p.reviewCount} {t("отз.")}</span>
                 </span>
                 <MatchRing score={overall} />
               </button>
@@ -798,7 +1088,7 @@ export default function TbilisiMiniApp() {
                 <div className="tms-legend">
                   {Object.entries(breakdown).map(([key, score]) => (
                     <div className="tms-legend-row" key={key}>
-                      <span className="tms-legend-label">{FACTOR_LABELS[key]}</span>
+                      <span className="tms-legend-label">{t(FACTOR_LABELS[key])}</span>
                       <span className="tms-legend-bar-track"><span className="tms-legend-bar-fill" style={{ width: `${score}%` }} /></span>
                       <span className="tms-legend-weight">{FACTOR_WEIGHTS[key]}%</span>
                     </div>
@@ -807,7 +1097,7 @@ export default function TbilisiMiniApp() {
               )}
             </div>
           ))}
-          {candidates.length === 0 && <p className="muted">Подходящих мастеров пока нет — загляните позже в «Мои заявки».</p>}
+          {candidates.length === 0 && <p className="muted">{t("Подходящих мастеров пока нет — загляните позже в «Мои заявки».")}</p>}
         </div>
       </div>
     );
@@ -824,20 +1114,20 @@ export default function TbilisiMiniApp() {
           <span className="tms-provider-avatar">👤</span>
           <div>
             <p className="tms-provider-name">{o.provider.user.name}</p>
-            <p className="tms-provider-meta">★ {o.provider.rating.toFixed(1)}{showRequestLabel ? ` · Заявка: ${o.request.service.name}` : ""}</p>
+            <p className="tms-provider-meta">★ {o.provider.rating.toFixed(1)}{showRequestLabel ? ` · ${t("Заявка")}: ${o.request.service.name}` : ""}</p>
           </div>
           <p className="tms-offer-terms">{o.price} ₾</p>
         </div>
         {o.comment && <p className="tms-offer-comment">«{o.comment}»</p>}
         <div className="tms-offer-actions">
-          <button className="tms-decline-btn" onClick={() => viewProvider(o.providerId)}>Посмотреть мастера</button>
+          <button className="tms-decline-btn" onClick={() => viewProvider(o.providerId)}>{t("Посмотреть мастера")}</button>
           {o.status === "pending" ? (
             <>
-              <button className="tms-select-btn" onClick={() => respondToOffer(o.id, "accepted")}>Выбрать</button>
-              <button className="tms-decline-btn" onClick={() => respondToOffer(o.id, "declined")}>Отказаться</button>
+              <button className="tms-select-btn" onClick={() => respondToOffer(o.id, "accepted")}>{t("Выбрать")}</button>
+              <button className="tms-decline-btn" onClick={() => respondToOffer(o.id, "declined")}>{t("Отказаться")}</button>
             </>
           ) : (
-            <span className="tms-provider-meta">{o.status === "accepted" ? "выбран" : "отклонён"}</span>
+            <span className="tms-provider-meta">{t(o.status === "accepted" ? "выбран" : "отклонён")}</span>
           )}
         </div>
       </div>
@@ -850,17 +1140,17 @@ export default function TbilisiMiniApp() {
     return (
       <div className="tms-screen">
         <div className="tms-hero">
-          <p className="tms-greeting">Привет</p>
+          <p className="tms-greeting">{t("Привет")}</p>
           <h1 className="tms-hero-title">{tgUser.name}</h1>
         </div>
         <div className="tms-stat-grid">
-          <StatCard icon="📨" label="Активная заявка" value={activeRequests.length}
+          <StatCard icon="📨" label={t("Активная заявка")} value={activeRequests.length}
             onClick={activeRequests.length ? () => openRequestDetail(activeRequests[0]) : undefined} />
-          <StatCard icon="🟢" label="Заказы в работе" value={inWorkRequests.length}
+          <StatCard icon="🟢" label={t("Заказы в работе")} value={inWorkRequests.length}
             onClick={() => goTab("client-my-orders")} />
         </div>
         <div className="tms-section">
-          <button className="tms-mainbutton" onClick={openCreateRequest}>+ Создать заявку</button>
+          <button className="tms-mainbutton" onClick={openCreateRequest}>{t("+ Создать заявку")}</button>
         </div>
       </div>
     );
@@ -871,34 +1161,34 @@ export default function TbilisiMiniApp() {
     const archivedList = myRequests.filter((r) => r.archived);
     return (
       <div className="tms-screen">
-        <div className="tms-section" style={{ marginTop: 4 }}><p className="tms-section-label">Мои заявки</p></div>
+        <div className="tms-section" style={{ marginTop: 4 }}><p className="tms-section-label">{t("Мои заявки")}</p></div>
         <div className="tms-provider-list">
           {openList.map((r) => (
             <div key={r.id} className="tms-provider-row">
               <div className="tms-provider-info" style={{ flex: 1 }}>
                 <span className="tms-provider-name">{r.description || r.service.name}</span>
-                <span className="tms-provider-meta">{r.area || "район не указан"}</span>
-                <span className="tms-provider-meta">Статус: поиск мастера</span>
-                {r.urgency && <span className="tms-provider-meta">{r.urgency}</span>}
-                {typeof r.budget === "number" && <span className="tms-provider-meta">Бюджет: до {r.budget} ₾</span>}
-                <span className="tms-provider-meta">Предложений: {r.offers.length}</span>
+                <span className="tms-provider-meta">{t(r.area) || t("район не указан")}</span>
+                <span className="tms-provider-meta">{t("Статус: поиск мастера")}</span>
+                {r.urgency && <span className="tms-provider-meta">{t(r.urgency)}</span>}
+                {typeof r.budget === "number" && <span className="tms-provider-meta">{t("Бюджет: до")} {r.budget} ₾</span>}
+                <span className="tms-provider-meta">{t("Предложений")}: {r.offers.length}</span>
               </div>
-              <button className="tms-select-btn" onClick={() => openRequestDetail(r)}>Открыть</button>
+              <button className="tms-select-btn" onClick={() => openRequestDetail(r)}>{t("Открыть")}</button>
             </div>
           ))}
-          {openList.length === 0 && <p className="muted">Активных заявок пока нет.</p>}
+          {openList.length === 0 && <p className="muted">{t("Активных заявок пока нет.")}</p>}
         </div>
         {archivedList.length > 0 && (
           <details className="tms-archive">
-            <summary>Архив заявок ({archivedList.length})</summary>
+            <summary>{t("Архив заявок")} ({archivedList.length})</summary>
             <div className="tms-provider-list" style={{ marginTop: 10 }}>
               {archivedList.map((r) => (
                 <div key={r.id} className="tms-provider-row">
                   <div className="tms-provider-info" style={{ flex: 1 }}>
                     <span className="tms-provider-name">{r.description || r.service.name}</span>
-                    <span className="tms-provider-meta">{r.area || "район не указан"} · удалена</span>
+                    <span className="tms-provider-meta">{t(r.area) || t("район не указан")} {t("· удалена")}</span>
                   </div>
-                  <button className="tms-decline-btn" onClick={() => openRequestDetail(r)}>Открыть</button>
+                  <button className="tms-decline-btn" onClick={() => openRequestDetail(r)}>{t("Открыть")}</button>
                 </div>
               ))}
             </div>
@@ -915,32 +1205,32 @@ export default function TbilisiMiniApp() {
       <div className="tms-screen">
         <div className="tms-section" style={{ marginTop: 4 }}>
           <p className="tms-section-label">{r.service.name}</p>
-          <p className="tms-body-text">{r.description || "Без описания"}</p>
+          <p className="tms-body-text">{r.description || t("Без описания")}</p>
         </div>
         <div className="tms-section">
           <div className="tms-chip-wrap">
-            <span className="tms-summary-pill">{r.area || "район не указан"}</span>
-            <span className="tms-summary-pill">{r.urgency || "срочность не указана"}</span>
-            {typeof r.budget === "number" && <span className="tms-summary-pill">до {r.budget} ₾</span>}
+            <span className="tms-summary-pill">{t(r.area) || t("район не указан")}</span>
+            <span className="tms-summary-pill">{t(r.urgency) || t("срочность не указана")}</span>
+            {typeof r.budget === "number" && <span className="tms-summary-pill">{language === "en" ? "up to" : "до"} {r.budget} ₾</span>}
           </div>
         </div>
         <div className="tms-section">
-          <p className="tms-section-label">Статус: {r.archived ? "в архиве" : r.status === "open" ? "поиск мастера" : r.status === "matched" ? "мастер выбран" : r.status}</p>
+          <p className="tms-section-label">{t("Статус")}: {t(r.archived ? "в архиве" : STATUS_LABELS[r.status] || r.status)}</p>
         </div>
         {r.archived ? (
           <div className="tms-section">
-            <p className="muted">Заявка удалена и перенесена в архив — не участвует в статистике и не видна мастерам.</p>
+            <p className="muted">{t("Заявка удалена и перенесена в архив — не участвует в статистике и не видна мастерам.")}</p>
           </div>
         ) : (
           <>
             <div className="tms-section">
-              <p className="tms-section-label">Предложения ({r.offers.length})</p>
+              <p className="tms-section-label">{t("Предложения")} ({r.offers.length})</p>
               <div className="tms-offer-list">{r.offers.map((o) => renderOfferRow(o))}</div>
-              {r.offers.length === 0 && <p className="muted">Пока никто не откликнулся.</p>}
+              {r.offers.length === 0 && <p className="muted">{t("Пока никто не откликнулся.")}</p>}
             </div>
             {r.status === "open" && (
               <div className="tms-section">
-                <button className="tms-decline-btn" onClick={() => archiveRequest(r)}>Удалить заявку</button>
+                <button className="tms-decline-btn" onClick={() => archiveRequest(r)}>{t("Удалить заявку")}</button>
               </div>
             )}
           </>
@@ -955,9 +1245,9 @@ export default function TbilisiMiniApp() {
       .flatMap((r) => r.offers.filter((o) => o.status === "pending").map((o) => ({ ...o, request: r })));
     return (
       <div className="tms-screen">
-        <div className="tms-section" style={{ marginTop: 4 }}><p className="tms-section-label">Предложения от мастеров</p></div>
+        <div className="tms-section" style={{ marginTop: 4 }}><p className="tms-section-label">{t("Предложения от мастеров")}</p></div>
         <div className="tms-offer-list">{pending.map((o) => renderOfferRow(o, { showRequestLabel: true }))}</div>
-        {pending.length === 0 && <p className="muted">Пока нет новых предложений.</p>}
+        {pending.length === 0 && <p className="muted">{t("Пока нет новых предложений.")}</p>}
       </div>
     );
   }
@@ -973,19 +1263,19 @@ export default function TbilisiMiniApp() {
             <span className="tms-provider-avatar" style={{ fontSize: 32 }}>👤</span>
             <div>
               <p className="tms-provider-name" style={{ fontSize: 16 }}>{p.user.name}</p>
-              <p className="tms-provider-meta">{specialization || "Специализация не указана"}</p>
+              <p className="tms-provider-meta">{specialization || t("Специализация не указана")}</p>
             </div>
-            <span className={`tms-badge-verify ${p.verified ? "is-verified" : ""}`}>{p.verified ? "✅ Подтверждён" : "⏳ На проверке"}</span>
+            <span className={`tms-badge-verify ${p.verified ? "is-verified" : ""}`}>{t(p.verified ? "✅ Подтверждён" : "⏳ На проверке")}</span>
           </div>
-          <p className="tms-provider-meta">★ {p.rating.toFixed(1)} · {p.reviewCount} отз.</p>
+          <p className="tms-provider-meta">★ {p.rating.toFixed(1)} · {p.reviewCount} {t("отз.")}</p>
         </div>
         <div className="tms-section">
-          <p className="tms-section-label">Описание</p>
-          <p className="tms-body-text">{p.description || "Мастер пока не добавил описание."}</p>
+          <p className="tms-section-label">{t("Описание")}</p>
+          <p className="tms-body-text">{p.description || t("Мастер пока не добавил описание.")}</p>
         </div>
         <div className="tms-section">
-          <p className="tms-section-label">Языки</p>
-          <p className="muted">Мастер пока не указал языки в профиле.</p>
+          <p className="tms-section-label">{t("Языки")}</p>
+          <p className="muted">{t("Мастер пока не указал языки в профиле.")}</p>
         </div>
       </div>
     );
@@ -996,8 +1286,8 @@ export default function TbilisiMiniApp() {
     return (
       <button key={r.id} className="tms-order-card" onClick={() => openClientOrder(r)}>
         <div className="tms-provider-info" style={{ flex: 1 }}>
-          <span className="tms-provider-name">{offer?.provider.user.name || "Мастер"}{offer ? ` · ★${offer.provider.rating.toFixed(1)}` : ""}</span>
-          <span className="tms-provider-meta">{r.service.name}{locallyCompletedRequestIds.has(r.id) ? " · Завершён" : ""}</span>
+          <span className="tms-provider-name">{offer?.provider.user.name || t("Мастер")}{offer ? ` · ★${offer.provider.rating.toFixed(1)}` : ""}</span>
+          <span className="tms-provider-meta">{r.service.name}{locallyCompletedRequestIds.has(r.id) ? ` ${t("· Завершён")}` : ""}</span>
         </div>
         <span className="tms-offer-terms">{offer?.price ?? r.budget} ₾</span>
         <span className="tms-chevron">→</span>
@@ -1011,17 +1301,17 @@ export default function TbilisiMiniApp() {
     return (
       <div className="tms-screen">
         <div className="tms-section" style={{ marginTop: 4 }}>
-          <p className="tms-section-label">В работе</p>
+          <p className="tms-section-label">{t("В работе")}</p>
           <div className="tms-provider-list">
             {inWork.map(renderClientOrderRow)}
-            {inWork.length === 0 && <p className="muted">Активных заказов пока нет.</p>}
+            {inWork.length === 0 && <p className="muted">{t("Активных заказов пока нет.")}</p>}
           </div>
         </div>
         <div className="tms-section">
-          <p className="tms-section-label">История</p>
+          <p className="tms-section-label">{t("История")}</p>
           <div className="tms-provider-list">
             {history.map(renderClientOrderRow)}
-            {history.length === 0 && <p className="muted">Завершённых заказов пока нет.</p>}
+            {history.length === 0 && <p className="muted">{t("Завершённых заказов пока нет.")}</p>}
           </div>
         </div>
       </div>
@@ -1040,47 +1330,47 @@ export default function TbilisiMiniApp() {
           <div className="tms-profile-head">
             <span className="tms-provider-avatar" style={{ fontSize: 32 }}>👤</span>
             <div>
-              <p className="tms-provider-name" style={{ fontSize: 16 }}>{offer?.provider.user.name || "Мастер"}</p>
+              <p className="tms-provider-name" style={{ fontSize: 16 }}>{offer?.provider.user.name || t("Мастер")}</p>
               <p className="tms-provider-meta">{r.service.name}</p>
             </div>
-            {offer && <span className={`tms-badge-verify ${offer.provider.verified ? "is-verified" : ""}`}>{offer.provider.verified ? "✅ Подтверждён" : "⏳ На проверке"}</span>}
+            {offer && <span className={`tms-badge-verify ${offer.provider.verified ? "is-verified" : ""}`}>{t(offer.provider.verified ? "✅ Подтверждён" : "⏳ На проверке")}</span>}
           </div>
-          {offer && <p className="tms-provider-meta">★ {offer.provider.rating.toFixed(1)} · {offer.provider.reviewCount} отз.</p>}
+          {offer && <p className="tms-provider-meta">★ {offer.provider.rating.toFixed(1)} · {offer.provider.reviewCount} {t("отз.")}</p>}
         </div>
         {offer?.provider.description && (
           <div className="tms-section">
-            <p className="tms-section-label">Описание</p>
+            <p className="tms-section-label">{t("Описание")}</p>
             <p className="tms-body-text">{offer.provider.description}</p>
           </div>
         )}
         <div className="tms-section">
-          <p className="tms-section-label">Языки</p>
-          <p className="muted">Мастер пока не указал языки в профиле.</p>
+          <p className="tms-section-label">{t("Языки")}</p>
+          <p className="muted">{t("Мастер пока не указал языки в профиле.")}</p>
         </div>
         <div className="tms-section">
-          <p className="tms-section-label">Стоимость</p>
+          <p className="tms-section-label">{t("Стоимость")}</p>
           <p className="tms-body-text">{offer?.price ?? r.budget} ₾</p>
         </div>
         <div className="tms-section">
-          <p className="tms-section-label">Создано</p>
-          <p className="tms-body-text">{new Date(r.createdAt).toLocaleDateString("ru-RU")}</p>
+          <p className="tms-section-label">{t("Создано")}</p>
+          <p className="tms-body-text">{new Date(r.createdAt).toLocaleDateString(locale)}</p>
         </div>
         {isCompleted ? (
           <>
             {review && (
               <div className="tms-section">
-                <p className="tms-section-label">Ваш отзыв</p>
+                <p className="tms-section-label">{t("Ваш отзыв")}</p>
                 <p className="tms-review-stars">{"★".repeat(review.rating)}{"☆".repeat(5 - review.rating)}</p>
                 {review.text && <p className="tms-body-text">«{review.text}»</p>}
               </div>
             )}
             <div className="tms-section">
-              <button className="tms-select-btn" style={{ width: "100%", padding: "12px" }} onClick={openCreateRequest}>Создать ещё заявку</button>
+              <button className="tms-select-btn" style={{ width: "100%", padding: "12px" }} onClick={openCreateRequest}>{t("Создать ещё заявку")}</button>
             </div>
           </>
         ) : (
           <div className="tms-section">
-            <button className="tms-select-btn" style={{ width: "100%", padding: "12px" }} onClick={() => startReview(r)}>Завершить заказ</button>
+            <button className="tms-select-btn" style={{ width: "100%", padding: "12px" }} onClick={() => startReview(r)}>{t("Завершить заказ")}</button>
           </div>
         )}
       </div>
@@ -1094,15 +1384,15 @@ export default function TbilisiMiniApp() {
     return (
       <div className="tms-screen">
         <div className="tms-section" style={{ marginTop: 4 }}>
-          <p className="tms-section-label">Оцените мастера</p>
+          <p className="tms-section-label">{t("Оцените мастера")}</p>
           <p className="muted">{offer?.provider.user.name} · {r.service.name}</p>
         </div>
         <div className="tms-section">
-          <StarPicker value={reviewForm.rating} onChange={(rating) => setReviewForm((f) => ({ ...f, rating }))} />
+          <StarPicker value={reviewForm.rating} onChange={(rating) => setReviewForm((f) => ({ ...f, rating }))} t={t} />
         </div>
         <div className="tms-section">
-          <p className="tms-section-label">Комментарий (необязательно)</p>
-          <textarea className="tms-textarea" rows={3} placeholder="Что понравилось или что можно улучшить"
+          <p className="tms-section-label">{t("Комментарий (необязательно)")}</p>
+          <textarea className="tms-textarea" rows={3} placeholder={t("Что понравилось или что можно улучшить")}
             value={reviewForm.text} onChange={(e) => setReviewForm((f) => ({ ...f, text: e.target.value }))} />
         </div>
         {error && <p className="tms-error">{error}</p>}
@@ -1114,7 +1404,7 @@ export default function TbilisiMiniApp() {
     return (
       <div className="tms-screen">
         <div className="tms-section" style={{ marginTop: 4 }}>
-          <p className="tms-section-label">Аккаунт</p>
+          <p className="tms-section-label">{t("Аккаунт")}</p>
           <div className="tms-profile-card">
             <div className="tms-profile-head">
               {tgUser.photoUrl ? (
@@ -1128,46 +1418,39 @@ export default function TbilisiMiniApp() {
               </div>
             </div>
             <div className="tms-field-group">
-              <label className="tms-field"><span>Имя</span><input className="tms-field-input"
+              <label className="tms-field"><span>{t("Имя")}</span><input className="tms-field-input"
                 value={clientSettingsForm.name} onChange={(e) => setClientSettingsForm((f) => ({ ...f, name: e.target.value }))} /></label>
-              <label className="tms-field"><span>Телефон</span><input className="tms-field-input" placeholder="+995 5xx xx xx xx"
+              <label className="tms-field"><span>{t("Телефон")}</span><input className="tms-field-input" placeholder="+995 5xx xx xx xx"
                 value={clientSettingsForm.phone} onChange={(e) => setClientSettingsForm((f) => ({ ...f, phone: e.target.value }))} /></label>
-              <label className="tms-field"><span>Email</span><input className="tms-field-input" placeholder="mail@example.com"
+              <label className="tms-field"><span>{t("Email")}</span><input className="tms-field-input" placeholder="mail@example.com"
                 value={clientSettingsForm.email} onChange={(e) => setClientSettingsForm((f) => ({ ...f, email: e.target.value }))} /></label>
             </div>
           </div>
         </div>
 
         <div className="tms-section">
-          <p className="tms-section-label">Уведомления</p>
+          <p className="tms-section-label">{t("Уведомления")}</p>
           <div className="tms-profile-card">
-            <Toggle checked={clientSettingsForm.notifyOrders} onChange={(v) => setClientSettingsForm((f) => ({ ...f, notifyOrders: v }))} label="Заявки взяты в работу" />
-            <Toggle checked={clientSettingsForm.notifyChat} onChange={(v) => setClientSettingsForm((f) => ({ ...f, notifyChat: v }))} label="Чат с мастерами" />
+            <Toggle checked={clientSettingsForm.notifyOrders} onChange={(v) => setClientSettingsForm((f) => ({ ...f, notifyOrders: v }))} label={t("Заявки взяты в работу")} />
+            <Toggle checked={clientSettingsForm.notifyChat} onChange={(v) => setClientSettingsForm((f) => ({ ...f, notifyChat: v }))} label={t("Чат с мастерами")} />
           </div>
         </div>
 
         <div className="tms-section">
-          <p className="tms-section-label">Язык приложения</p>
-          <div className="tms-chip-wrap">
-            {APP_LANGUAGES.map((l) => <Chip key={l} label={l} active={clientSettingsForm.appLanguage === l} onClick={() => setClientSettingsForm((f) => ({ ...f, appLanguage: l }))} />)}
-          </div>
+          <p className="tms-section-label">{t("Поддержка")}</p>
+          <button className="tms-link-row" onClick={() => navigate("client-support")}>{t("Написать в поддержку →")}</button>
         </div>
 
         <div className="tms-section">
-          <p className="tms-section-label">Поддержка</p>
-          <button className="tms-link-row" onClick={() => navigate("client-support")}>Написать в поддержку →</button>
-        </div>
-
-        <div className="tms-section">
-          <p className="tms-section-label">Опасная зона</p>
+          <p className="tms-section-label">{t("Опасная зона")}</p>
           {!clientShowDeleteConfirm ? (
-            <button className="tms-decline-btn" onClick={() => setClientShowDeleteConfirm(true)}>Удалить аккаунт</button>
+            <button className="tms-decline-btn" onClick={() => setClientShowDeleteConfirm(true)}>{t("Удалить аккаунт")}</button>
           ) : (
             <div className="tms-profile-card">
-              <p className="tms-body-text">Все ваши заявки и отзывы будут удалены безвозвратно. Продолжить?</p>
+              <p className="tms-body-text">{t("Все ваши заявки и отзывы будут удалены безвозвратно. Продолжить?")}</p>
               <div className="tms-offer-actions">
-                <button className="tms-decline-btn" onClick={confirmDeleteClientAccount}>Да, удалить</button>
-                <button className="tms-select-btn" onClick={() => setClientShowDeleteConfirm(false)}>Отмена</button>
+                <button className="tms-decline-btn" onClick={confirmDeleteClientAccount}>{t("Да, удалить")}</button>
+                <button className="tms-select-btn" onClick={() => setClientShowDeleteConfirm(false)}>{t("Отмена")}</button>
               </div>
             </div>
           )}
@@ -1180,12 +1463,12 @@ export default function TbilisiMiniApp() {
 
   function renderProviderRegister() {
     const ready = providerForm.serviceIds.length > 0 && providerForm.areas.length > 0;
-    const groups = groupServicesByCategory(allServices);
+    const groups = groupServicesByCategory(allServices, t);
     return (
       <div className="tms-screen">
         <div className="tms-section">
-          <p className="tms-section-label">Какие услуги оказываете</p>
-          <p className="muted" style={{ marginTop: -6, marginBottom: 10 }}>Можно выбрать несколько</p>
+          <p className="tms-section-label">{t("Какие услуги оказываете")}</p>
+          <p className="muted" style={{ marginTop: -6, marginBottom: 10 }}>{t("Можно выбрать несколько")}</p>
           {groups.map((group) => (
             <div key={group.id} className="tms-cat-group">
               <p className="tms-cat-group-title">{group.icon} {group.name}</p>
@@ -1203,19 +1486,19 @@ export default function TbilisiMiniApp() {
           ))}
         </div>
         <div className="tms-section">
-          <p className="tms-section-label">Районы работы {providerForm.areas.length === 0 && <span className="tms-hint-inline">— выберите хотя бы один, иначе анкету не отправить</span>}</p>
+          <p className="tms-section-label">{t("Районы работы")} {providerForm.areas.length === 0 && <span className="tms-hint-inline">{t("— выберите хотя бы один, иначе анкету не отправить")}</span>}</p>
           <div className="tms-chip-wrap">
-            {DISTRICTS.map((d) => <Chip key={d} label={d} active={providerForm.areas.includes(d)} onClick={() => toggleProviderArea(d)} />)}
+            {DISTRICTS.map((d) => <Chip key={d} label={t(d)} active={providerForm.areas.includes(d)} onClick={() => toggleProviderArea(d)} />)}
           </div>
         </div>
         <div className="tms-section">
-          <p className="tms-section-label">Цена от (₾)</p>
+          <p className="tms-section-label">{t("Цена от (₾)")}</p>
           <input className="tms-textarea" type="number" placeholder="50"
             value={providerForm.priceFrom} onChange={(e) => setProviderForm((f) => ({ ...f, priceFrom: e.target.value }))} />
         </div>
         <div className="tms-section">
-          <p className="tms-section-label">О себе</p>
-          <textarea className="tms-textarea" rows={2} placeholder="Опыт, специализация"
+          <p className="tms-section-label">{t("О себе")}</p>
+          <textarea className="tms-textarea" rows={2} placeholder={t("Опыт, специализация")}
             value={providerForm.description} onChange={(e) => setProviderForm((f) => ({ ...f, description: e.target.value }))} />
         </div>
         {error && <p className="tms-error">{error}</p>}
@@ -1230,17 +1513,17 @@ export default function TbilisiMiniApp() {
     return (
       <div className="tms-screen">
         <div className="tms-section">
-          <p className="tms-section-label">Заявка</p>
-          <div className="tms-summary-pill">{offerTargetRequest.service.name} · {offerTargetRequest.area || "район не указан"}</div>
+          <p className="tms-section-label">{t("Заявка")}</p>
+          <div className="tms-summary-pill">{offerTargetRequest.service.name} · {t(offerTargetRequest.area) || t("район не указан")}</div>
         </div>
         <div className="tms-section">
-          <p className="tms-section-label">Ваша цена (₾)</p>
+          <p className="tms-section-label">{t("Ваша цена (₾)")}</p>
           <input className="tms-textarea" type="number" placeholder="80"
             value={offerForm.price} onChange={(e) => setOfferForm((f) => ({ ...f, price: e.target.value }))} />
         </div>
         <div className="tms-section">
-          <p className="tms-section-label">Комментарий</p>
-          <textarea className="tms-textarea" rows={2} placeholder="Когда сможете приехать, что учли"
+          <p className="tms-section-label">{t("Комментарий")}</p>
+          <textarea className="tms-textarea" rows={2} placeholder={t("Когда сможете приехать, что учли")}
             value={offerForm.comment} onChange={(e) => setOfferForm((f) => ({ ...f, comment: e.target.value }))} />
         </div>
         {error && <p className="tms-error">{error}</p>}
@@ -1257,34 +1540,34 @@ export default function TbilisiMiniApp() {
     return (
       <div className="tms-screen">
         <div className="tms-hero">
-          <p className="tms-greeting">Сегодня</p>
+          <p className="tms-greeting">{t("Сегодня")}</p>
           <h1 className="tms-hero-title">{tgUser.name}</h1>
         </div>
         <div className="tms-stat-grid">
-          <StatCard icon="🔔" label="Новых заявок" value={newCount} />
-          <StatCard icon="🟢" label="В работе" value={confirmedCount}
+          <StatCard icon="🔔" label={t("Новых заявок")} value={newCount} />
+          <StatCard icon="🟢" label={t("В работе")} value={confirmedCount}
             onClick={() => { setOrdersTab("confirmed"); navigate("provider-orders"); }} />
-          <StatCard icon="⭐" label="Рейтинг" value={ratingAvg.toFixed(1)}
+          <StatCard icon="⭐" label={t("Рейтинг")} value={ratingAvg.toFixed(1)}
             onClick={() => navigate("provider-reviews")} />
-          <StatCard icon="💬" label="Чаты с клиентами" value={confirmedCount}
+          <StatCard icon="💬" label={t("Чаты с клиентами")} value={confirmedCount}
             onClick={() => navigate("provider-messages")} />
         </div>
         <div className="tms-section">
           <div className="tms-income-card">
-            <span className="tms-provider-meta">Доход за месяц</span>
-            <span className="tms-income-value">{monthIncome.toLocaleString("ru-RU")} ₾</span>
+            <span className="tms-provider-meta">{t("Доход за месяц")}</span>
+            <span className="tms-income-value">{monthIncome.toLocaleString(locale)} ₾</span>
           </div>
         </div>
         <div className="tms-section">
-          <p className="tms-section-label">Конверсия</p>
+          <p className="tms-section-label">{t("Конверсия")}</p>
           <div className="tms-funnel">
-            <div className="tms-funnel-step"><span className="tms-funnel-value">{funnel.received}</span><span className="tms-provider-meta">заявок</span></div>
+            <div className="tms-funnel-step"><span className="tms-funnel-value">{funnel.received}</span><span className="tms-provider-meta">{t("заявок")}</span></div>
             <span className="tms-funnel-arrow">→</span>
-            <div className="tms-funnel-step"><span className="tms-funnel-value">{funnel.responded}</span><span className="tms-provider-meta">обработано</span></div>
+            <div className="tms-funnel-step"><span className="tms-funnel-value">{funnel.responded}</span><span className="tms-provider-meta">{t("обработано")}</span></div>
             <span className="tms-funnel-arrow">→</span>
-            <div className="tms-funnel-step"><span className="tms-funnel-value">{funnel.chosen}</span><span className="tms-provider-meta">заказов</span></div>
+            <div className="tms-funnel-step"><span className="tms-funnel-value">{funnel.chosen}</span><span className="tms-provider-meta">{t("заказов")}</span></div>
             <span className="tms-funnel-arrow">→</span>
-            <div className="tms-funnel-step"><span className="tms-funnel-value">{funnel.conversion}%</span><span className="tms-provider-meta">конверсия</span></div>
+            <div className="tms-funnel-step"><span className="tms-funnel-value">{funnel.conversion}%</span><span className="tms-provider-meta">{t("конверсия")}</span></div>
           </div>
         </div>
       </div>
@@ -1298,10 +1581,10 @@ export default function TbilisiMiniApp() {
     const declinedOffers = getDeclinedOffers();
     const dismissedList = openRequests.filter((r) => dismissedRequestIds.has(r.id));
     const tabs = [
-      { value: "new", label: "Новые", count: newList.length },
-      { value: "inWork", label: "В работе", count: inWorkList.length },
-      { value: "completed", label: "Завершённые", count: completedList.length },
-      { value: "declined", label: "Отклонённые", count: declinedOffers.length + dismissedList.length },
+      { value: "new", label: t("Новые"), count: newList.length },
+      { value: "inWork", label: t("В работе"), count: inWorkList.length },
+      { value: "completed", label: t("Завершённые"), count: completedList.length },
+      { value: "declined", label: t("Отклонённые"), count: declinedOffers.length + dismissedList.length },
     ];
     return (
       <div className="tms-screen">
@@ -1313,13 +1596,13 @@ export default function TbilisiMiniApp() {
             <div key={r.id} className="tms-provider-row">
               <div className="tms-provider-info" style={{ flex: 1 }}>
                 <span className="tms-provider-name">{r.service.name}</span>
-                <span className="tms-provider-meta">{r.area || "район не указан"}{r.urgency ? ` · ${r.urgency}` : ""}</span>
+                <span className="tms-provider-meta">{t(r.area) || t("район не указан")}{r.urgency ? ` · ${t(r.urgency)}` : ""}</span>
                 {r.description && <span className="tms-provider-meta">{r.description}</span>}
-                {typeof r.budget === "number" && <span className="tms-provider-meta">до {r.budget} ₾</span>}
+                {typeof r.budget === "number" && <span className="tms-provider-meta">{language === "en" ? "up to" : "до"} {r.budget} ₾</span>}
               </div>
               <div className="tms-offer-actions" style={{ marginTop: 0 }}>
-                <button className="tms-select-btn" onClick={() => startOffer(r)}>Взять в работу</button>
-                <button className="tms-decline-btn" onClick={() => dismissRequest(r.id)}>Отказаться</button>
+                <button className="tms-select-btn" onClick={() => startOffer(r)}>{t("Взять в работу")}</button>
+                <button className="tms-decline-btn" onClick={() => dismissRequest(r.id)}>{t("Отказаться")}</button>
               </div>
             </div>
           ))}
@@ -1327,8 +1610,8 @@ export default function TbilisiMiniApp() {
             <div key={o.id} className="tms-provider-row">
               <div className="tms-provider-info" style={{ flex: 1 }}>
                 <span className="tms-provider-name">{o.request.service.name}</span>
-                <span className="tms-provider-meta">{o.request.area || "район не указан"}</span>
-                <span className="tms-provider-meta">{o.status === "pending" ? "Ждём ответа клиента" : "В работе"}</span>
+                <span className="tms-provider-meta">{t(o.request.area) || t("район не указан")}</span>
+                <span className="tms-provider-meta">{t(o.status === "pending" ? "Ждём ответа клиента" : "В работе")}</span>
                 <span className="tms-provider-meta">{o.price} ₾</span>
               </div>
             </div>
@@ -1338,7 +1621,7 @@ export default function TbilisiMiniApp() {
               <div className="tms-provider-info" style={{ flex: 1 }}>
                 <span className="tms-provider-name">{o.request.service.name}</span>
                 <span className="tms-provider-meta">{o.price} ₾</span>
-                <span className="tms-provider-meta">Создано {new Date(o.createdAt).toLocaleDateString("ru-RU")}</span>
+                <span className="tms-provider-meta">{t("Создано")} {new Date(o.createdAt).toLocaleDateString(locale)}</span>
               </div>
             </div>
           ))}
@@ -1348,7 +1631,7 @@ export default function TbilisiMiniApp() {
                 <div key={`o-${o.id}`} className="tms-provider-row">
                   <div className="tms-provider-info" style={{ flex: 1 }}>
                     <span className="tms-provider-name">{o.request.service.name}</span>
-                    <span className="tms-provider-meta">Клиент отклонил ваш отклик ({o.price} ₾)</span>
+                    <span className="tms-provider-meta">{t("Клиент отклонил ваш отклик")} ({o.price} ₾)</span>
                   </div>
                 </div>
               ))}
@@ -1356,7 +1639,7 @@ export default function TbilisiMiniApp() {
                 <div key={`r-${r.id}`} className="tms-provider-row">
                   <div className="tms-provider-info" style={{ flex: 1 }}>
                     <span className="tms-provider-name">{r.service.name}</span>
-                    <span className="tms-provider-meta">Вы отказались от заявки</span>
+                    <span className="tms-provider-meta">{t("Вы отказались от заявки")}</span>
                   </div>
                 </div>
               ))}
@@ -1366,7 +1649,7 @@ export default function TbilisiMiniApp() {
             (requestsTab === "inWork" && inWorkList.length === 0) ||
             (requestsTab === "completed" && completedList.length === 0) ||
             (requestsTab === "declined" && declinedOffers.length === 0 && dismissedList.length === 0)) && (
-            <p className="muted">Здесь пока пусто.</p>
+            <p className="muted">{t("Здесь пока пусто.")}</p>
           )}
         </div>
       </div>
@@ -1379,9 +1662,9 @@ export default function TbilisiMiniApp() {
     const cancelledOrders = getCancelledOrders();
     const listByTab = { confirmed: confirmedOrders, completed: completedOrders, cancelled: cancelledOrders };
     const tabs = [
-      { value: "confirmed", label: "Подтверждённые", count: confirmedOrders.length },
-      { value: "completed", label: "Завершённые", count: completedOrders.length },
-      { value: "cancelled", label: "Отменённые", count: cancelledOrders.length },
+      { value: "confirmed", label: t("Подтверждённые"), count: confirmedOrders.length },
+      { value: "completed", label: t("Завершённые"), count: completedOrders.length },
+      { value: "cancelled", label: t("Отменённые"), count: cancelledOrders.length },
     ];
     const list = listByTab[ordersTab];
     return (
@@ -1394,13 +1677,13 @@ export default function TbilisiMiniApp() {
             <button key={o.id} className="tms-order-card" onClick={() => openOrderDetail(o)}>
               <div className="tms-provider-info" style={{ flex: 1 }}>
                 <span className="tms-provider-name">{o.request.service.name}</span>
-                <span className="tms-provider-meta">{o.request.user.name} · {o.request.area || "район не указан"}</span>
+                <span className="tms-provider-meta">{o.request.user.name} · {t(o.request.area) || t("район не указан")}</span>
               </div>
               <span className="tms-offer-terms">{o.price} ₾</span>
               <span className="tms-chevron">→</span>
             </button>
           ))}
-          {list.length === 0 && <p className="muted">Здесь пока пусто.</p>}
+          {list.length === 0 && <p className="muted">{t("Здесь пока пусто.")}</p>}
         </div>
       </div>
     );
@@ -1413,34 +1696,34 @@ export default function TbilisiMiniApp() {
     return (
       <div className="tms-screen">
         <div className="tms-section">
-          <p className="tms-section-label">Описание работы</p>
-          <p className="tms-body-text">{o.request.description || "Без описания"}</p>
+          <p className="tms-section-label">{t("Описание работы")}</p>
+          <p className="tms-body-text">{o.request.description || t("Без описания")}</p>
         </div>
         <div className="tms-section">
-          <p className="tms-section-label">Клиент</p>
+          <p className="tms-section-label">{t("Клиент")}</p>
           <div className="tms-provider-main" style={{ cursor: "default" }}>
             <span className="tms-provider-avatar">👤</span>
             <span className="tms-provider-info">
               <span className="tms-provider-name">{o.request.user.name}</span>
-              <span className="tms-provider-meta">{o.request.user.username ? `@${o.request.user.username}` : "username не указан"}</span>
+              <span className="tms-provider-meta">{o.request.user.username ? `@${o.request.user.username}` : t("username не указан")}</span>
             </span>
           </div>
         </div>
         <div className="tms-section">
-          <p className="tms-section-label">Адрес / район</p>
-          <p className="tms-body-text">{o.request.area || "не указан"}</p>
+          <p className="tms-section-label">{t("Адрес / район")}</p>
+          <p className="tms-body-text">{t(o.request.area) || t("не указан")}</p>
         </div>
         <div className="tms-section">
-          <p className="tms-section-label">Сумма работы</p>
+          <p className="tms-section-label">{t("Сумма работы")}</p>
           <p className="tms-body-text">{o.price} ₾</p>
         </div>
         <div className="tms-section">
           {telegramLink ? (
             <a className="tms-select-btn" style={{ display: "block", width: "100%", padding: "12px", textAlign: "center", textDecoration: "none" }} href={telegramLink} target="_blank" rel="noreferrer">
-              💬 Написать в Telegram
+              {t("💬 Написать в Telegram")}
             </a>
           ) : (
-            <p className="muted">Клиент не указал username в Telegram — свяжитесь через заявку.</p>
+            <p className="muted">{t("Клиент не указал username в Telegram — свяжитесь через заявку.")}</p>
           )}
         </div>
       </div>
@@ -1451,7 +1734,7 @@ export default function TbilisiMiniApp() {
     const confirmedOrders = getConfirmedOrders();
     return (
       <div className="tms-screen">
-        <div className="tms-section"><p className="tms-section-label">Клиенты по активным заказам</p></div>
+        <div className="tms-section"><p className="tms-section-label">{t("Клиенты по активным заказам")}</p></div>
         <div className="tms-list">
           {confirmedOrders.map((o) => (
             <button key={o.id} className="tms-list-row" onClick={() => openOrderDetail(o)}>
@@ -1462,21 +1745,21 @@ export default function TbilisiMiniApp() {
               <span className="tms-chevron">→</span>
             </button>
           ))}
-          {confirmedOrders.length === 0 && <p className="muted">Активных заказов пока нет.</p>}
+          {confirmedOrders.length === 0 && <p className="muted">{t("Активных заказов пока нет.")}</p>}
         </div>
       </div>
     );
   }
 
   function renderProviderProfileCabinet() {
-    const groups = groupServicesByCategory(allServices);
+    const groups = groupServicesByCategory(allServices, t);
     const selectedCategoryNames = [
       ...new Set(allServices.filter((s) => providerForm.serviceIds.includes(s.id)).map((s) => s.category?.name).filter(Boolean)),
     ];
     return (
       <div className="tms-screen">
         <div className="tms-section" style={{ marginTop: 4 }}>
-          <p className="tms-section-label">Основная информация</p>
+          <p className="tms-section-label">{t("Основная информация")}</p>
           <div className="tms-profile-card">
             <div className="tms-profile-head">
               {tgUser.photoUrl ? (
@@ -1486,47 +1769,47 @@ export default function TbilisiMiniApp() {
               )}
               <div>
                 <p className="tms-provider-name" style={{ fontSize: 16 }}>{tgUser.name}</p>
-                <p className="tms-provider-meta">{selectedCategoryNames.length ? selectedCategoryNames.join(" · ") : "Категория не выбрана"}</p>
+                <p className="tms-provider-meta">{selectedCategoryNames.length ? selectedCategoryNames.join(" · ") : t("Категория не выбрана")}</p>
               </div>
               <span className={`tms-badge-verify ${provider?.verified ? "is-verified" : ""}`}>
-                {provider?.verified ? "✅ Подтверждён" : "⏳ На проверке"}
+                {t(provider?.verified ? "✅ Подтверждён" : "⏳ На проверке")}
               </span>
             </div>
-            <textarea className="tms-textarea" rows={3} placeholder="Расскажите об опыте и специализации"
+            <textarea className="tms-textarea" rows={3} placeholder={t("Расскажите об опыте и специализации")}
               value={providerForm.description} onChange={(e) => setProviderForm((f) => ({ ...f, description: e.target.value }))} />
           </div>
         </div>
 
         <div className="tms-section">
-          <p className="tms-section-label">Языки</p>
+          <p className="tms-section-label">{t("Языки")}</p>
           <div className="tms-chip-wrap">
-            {LANGUAGE_OPTIONS.map((l) => <Chip key={l} label={l} active={profileExtra.languages.includes(l)} onClick={() => toggleProfileLanguage(l)} />)}
+            {LANGUAGE_OPTIONS.map((l) => <Chip key={l} label={t(l)} active={profileExtra.languages.includes(l)} onClick={() => toggleProfileLanguage(l)} />)}
           </div>
         </div>
 
         <div className="tms-section">
-          <p className="tms-section-label">Контакты</p>
+          <p className="tms-section-label">{t("Контакты")}</p>
           <div className="tms-field-group">
-            <label className="tms-field"><span>Телефон</span><input className="tms-field-input" placeholder="+995 5xx xx xx xx"
+            <label className="tms-field"><span>{t("Телефон")}</span><input className="tms-field-input" placeholder="+995 5xx xx xx xx"
               value={profileExtra.phone} onChange={(e) => setProfileExtra((f) => ({ ...f, phone: e.target.value }))} /></label>
             <label className="tms-field"><span>Telegram</span><input className="tms-field-input" placeholder="@username"
               value={profileExtra.telegramContact} onChange={(e) => setProfileExtra((f) => ({ ...f, telegramContact: e.target.value }))} /></label>
-            <label className="tms-field"><span>Email</span><input className="tms-field-input" placeholder="mail@example.com"
+            <label className="tms-field"><span>{t("Email")}</span><input className="tms-field-input" placeholder="mail@example.com"
               value={profileExtra.email} onChange={(e) => setProfileExtra((f) => ({ ...f, email: e.target.value }))} /></label>
           </div>
           <Toggle checked={profileExtra.contactsHidden} onChange={(v) => setProfileExtra((f) => ({ ...f, contactsHidden: v }))}
-            label="Скрывать контакты от клиентов" sub="Клиент увидит контакты только после подтверждения заказа" />
+            label={t("Скрывать контакты от клиентов")} sub={t("Клиент увидит контакты только после подтверждения заказа")} />
         </div>
 
         <div className="tms-section">
-          <p className="tms-section-label">География — работаю</p>
+          <p className="tms-section-label">{t("География — работаю")}</p>
           <div className="tms-chip-wrap">
-            {DISTRICTS.map((d) => <Chip key={d} label={d} active={providerForm.areas.includes(d)} onClick={() => toggleProviderArea(d)} />)}
+            {DISTRICTS.map((d) => <Chip key={d} label={t(d)} active={providerForm.areas.includes(d)} onClick={() => toggleProviderArea(d)} />)}
           </div>
         </div>
 
         <div className="tms-section">
-          <p className="tms-section-label">Услуги</p>
+          <p className="tms-section-label">{t("Услуги")}</p>
           {groups.map((group) => (
             <div key={group.id} className="tms-cat-group">
               <p className="tms-cat-group-title">{group.icon} {group.name}</p>
@@ -1542,17 +1825,17 @@ export default function TbilisiMiniApp() {
               </div>
             </div>
           ))}
-          {groups.length === 0 && <p className="muted">Загрузка списка услуг…</p>}
+          {groups.length === 0 && <p className="muted">{t("Загрузка списка услуг…")}</p>}
         </div>
 
         <div className="tms-section">
-          <p className="tms-section-label">Цены</p>
+          <p className="tms-section-label">{t("Цены")}</p>
           <div className="tms-field-group">
-            <label className="tms-field"><span>Выезд, ₾</span><input className="tms-field-input" type="number" placeholder="20"
+            <label className="tms-field"><span>{t("Выезд, ₾")}</span><input className="tms-field-input" type="number" placeholder="20"
               value={profileExtra.calloutPrice} onChange={(e) => setProfileExtra((f) => ({ ...f, calloutPrice: e.target.value }))} /></label>
-            <label className="tms-field"><span>Минимальный заказ, ₾</span><input className="tms-field-input" type="number" placeholder="50"
+            <label className="tms-field"><span>{t("Минимальный заказ, ₾")}</span><input className="tms-field-input" type="number" placeholder="50"
               value={profileExtra.minOrderPrice} onChange={(e) => setProfileExtra((f) => ({ ...f, minOrderPrice: e.target.value }))} /></label>
-            <label className="tms-field"><span>Почасовая ставка, ₾</span><input className="tms-field-input" type="number" placeholder="40"
+            <label className="tms-field"><span>{t("Почасовая ставка, ₾")}</span><input className="tms-field-input" type="number" placeholder="40"
               value={profileExtra.hourlyRate} onChange={(e) => setProfileExtra((f) => ({ ...f, hourlyRate: e.target.value }))} /></label>
           </div>
         </div>
@@ -1562,11 +1845,11 @@ export default function TbilisiMiniApp() {
 
   function renderProviderMore() {
     const items = [
-      { key: "provider-analytics", icon: "📈", label: "Аналитика" },
-      { key: "provider-reviews", icon: "⭐", label: "Отзывы" },
-      { key: "provider-finance", icon: "💰", label: "Финансы" },
-      { key: "provider-subscription", icon: "💳", label: "Подписка" },
-      { key: "provider-settings", icon: "⚙️", label: "Настройки" },
+      { key: "provider-analytics", icon: "📈", label: t("Аналитика") },
+      { key: "provider-reviews", icon: "⭐", label: t("Отзывы") },
+      { key: "provider-finance", icon: "💰", label: t("Финансы") },
+      { key: "provider-subscription", icon: "💳", label: t("Подписка") },
+      { key: "provider-settings", icon: "⚙️", label: t("Настройки") },
     ];
     return (
       <div className="tms-screen">
@@ -1588,12 +1871,12 @@ export default function TbilisiMiniApp() {
     return (
       <div className="tms-screen">
         <div className="tms-stat-grid">
-          <StatCard icon="📥" label="Получено заявок" value={funnel.received} />
-          <StatCard icon="✉️" label="Обработано" value={funnel.responded} />
-          <StatCard icon="✅" label="Выбрали (заказы)" value={funnel.chosen} />
-          <StatCard icon="📊" label="Конверсия" value={`${funnel.conversion}%`} />
-          <StatCard icon="🔁" label="Повторные клиенты" value={repeatClients} />
-          <StatCard icon="💰" label="Доход за месяц" value={`${monthIncome.toLocaleString("ru-RU")} ₾`} />
+          <StatCard icon="📥" label={t("Получено заявок")} value={funnel.received} />
+          <StatCard icon="✉️" label={t("Обработано")} value={funnel.responded} />
+          <StatCard icon="✅" label={t("Выбрали (заказы)")} value={funnel.chosen} />
+          <StatCard icon="📊" label={t("Конверсия")} value={`${funnel.conversion}%`} />
+          <StatCard icon="🔁" label={t("Повторные клиенты")} value={repeatClients} />
+          <StatCard icon="💰" label={t("Доход за месяц")} value={`${monthIncome.toLocaleString(locale)} ₾`} />
         </div>
       </div>
     );
@@ -1605,10 +1888,10 @@ export default function TbilisiMiniApp() {
     const maxCount = Math.max(1, ...distribution.map((d) => d.count));
     const reviews = provider?.reviews || [];
     const list = (all ? reviews : reviews.slice(0, 3)).map((r) => ({
-      name: r.user?.name || "Клиент",
+      name: r.user?.name || t("Клиент"),
       text: r.text,
       rating: r.rating,
-      date: new Date(r.createdAt).toLocaleDateString("ru-RU"),
+      date: new Date(r.createdAt).toLocaleDateString(locale),
     }));
     return (
       <div className="tms-screen">
@@ -1618,7 +1901,7 @@ export default function TbilisiMiniApp() {
               <div className="tms-review-score">
                 <span className="tms-review-score-value">{rating.toFixed(1)}</span>
                 <span className="tms-review-stars">{"★".repeat(Math.round(rating))}{"☆".repeat(5 - Math.round(rating))}</span>
-                <span className="tms-provider-meta">{total} отзывов</span>
+                <span className="tms-provider-meta">{total} {t("отзывов")}</span>
               </div>
               <div className="tms-review-bars">
                 {distribution.map((d) => (
@@ -1633,14 +1916,14 @@ export default function TbilisiMiniApp() {
           </div>
         )}
         <div className="tms-section">
-          {!all && <p className="tms-section-label">Последние отзывы</p>}
+          {!all && <p className="tms-section-label">{t("Последние отзывы")}</p>}
           <div className="tms-list-plain">
             {list.map((r, i) => <ReviewRow key={i} review={r} />)}
           </div>
-          {list.length === 0 && <p className="muted">Отзывов пока нет.</p>}
+          {list.length === 0 && <p className="muted">{t("Отзывов пока нет.")}</p>}
           {!all && reviews.length > 3 && (
             <button className="tms-link-row" style={{ marginTop: 12 }} onClick={() => navigate("provider-reviews-all")}>
-              Показать все отзывы →
+              {t("Показать все отзывы →")}
             </button>
           )}
         </div>
@@ -1651,28 +1934,28 @@ export default function TbilisiMiniApp() {
   function renderProviderFinance() {
     const balance = getAllTimeIncome();
     const history = getCompletedOffers()
-      .map((o) => ({ date: new Date(o.createdAt).toLocaleDateString("ru-RU"), requestId: o.requestId, amount: o.price }))
+      .map((o) => ({ date: new Date(o.createdAt).toLocaleDateString(locale), requestId: o.requestId, amount: o.price }))
       .sort((a, b) => b.requestId - a.requestId);
     return (
       <div className="tms-screen">
-        <p className="tms-inprogress-note">Раздел в разработке — сумма и история уже реальные, оформление появится позже</p>
+        <p className="tms-inprogress-note">{t("Раздел в разработке — сумма и история уже реальные, оформление появится позже")}</p>
         <div className="tms-section" style={{ marginTop: 4 }}>
           <div className="tms-income-card">
-            <span className="tms-provider-meta">Баланс</span>
-            <span className="tms-income-value">{balance.toLocaleString("ru-RU")} ₾</span>
+            <span className="tms-provider-meta">{t("Баланс")}</span>
+            <span className="tms-income-value">{balance.toLocaleString(locale)} ₾</span>
           </div>
         </div>
         <div className="tms-section">
-          <p className="tms-section-label">История операций</p>
+          <p className="tms-section-label">{t("История операций")}</p>
           <div className="tms-list">
             {history.map((h, i) => (
               <div key={i} className="tms-list-row" style={{ cursor: "default" }}>
-                <span>{h.date} · заявка №{h.requestId}</span>
+                <span>{h.date} · {t("заявка №")}{h.requestId}</span>
                 <span>+{h.amount} ₾</span>
               </div>
             ))}
           </div>
-          {history.length === 0 && <p className="muted">Завершённых заказов пока нет.</p>}
+          {history.length === 0 && <p className="muted">{t("Завершённых заказов пока нет.")}</p>}
         </div>
       </div>
     );
@@ -1681,11 +1964,11 @@ export default function TbilisiMiniApp() {
   function renderProviderSubscription() {
     return (
       <div className="tms-screen">
-        <p className="tms-inprogress-note">Раздел в разработке</p>
+        <p className="tms-inprogress-note">{t("Раздел в разработке")}</p>
         <div className="tms-section" style={{ marginTop: 4 }}>
           <div className="tms-profile-card">
-            <p className="tms-provider-name">Подписка появится позже</p>
-            <p className="muted">Как только определимся с моделью монетизации — здесь можно будет выбрать тариф и продвижение анкеты.</p>
+            <p className="tms-provider-name">{t("Подписка появится позже")}</p>
+            <p className="muted">{t("Как только определимся с моделью монетизации — здесь можно будет выбрать тариф и продвижение анкеты.")}</p>
           </div>
         </div>
       </div>
@@ -1696,50 +1979,43 @@ export default function TbilisiMiniApp() {
     return (
       <div className="tms-screen">
         <div className="tms-section" style={{ marginTop: 4 }}>
-          <p className="tms-section-label">Аккаунт</p>
+          <p className="tms-section-label">{t("Аккаунт")}</p>
           <div className="tms-field-group">
-            <label className="tms-field"><span>Имя</span><input className="tms-field-input"
+            <label className="tms-field"><span>{t("Имя")}</span><input className="tms-field-input"
               value={settingsForm.name} onChange={(e) => setSettingsForm((f) => ({ ...f, name: e.target.value }))} /></label>
-            <label className="tms-field"><span>Телефон</span><input className="tms-field-input" placeholder="+995 5xx xx xx xx"
+            <label className="tms-field"><span>{t("Телефон")}</span><input className="tms-field-input" placeholder="+995 5xx xx xx xx"
               value={settingsForm.phone} onChange={(e) => setSettingsForm((f) => ({ ...f, phone: e.target.value }))} /></label>
-            <label className="tms-field"><span>Email</span><input className="tms-field-input" placeholder="mail@example.com"
+            <label className="tms-field"><span>{t("Email")}</span><input className="tms-field-input" placeholder="mail@example.com"
               value={settingsForm.email} onChange={(e) => setSettingsForm((f) => ({ ...f, email: e.target.value }))} /></label>
           </div>
         </div>
 
         <div className="tms-section">
-          <p className="tms-section-label">Уведомления</p>
+          <p className="tms-section-label">{t("Уведомления")}</p>
           <div className="tms-profile-card">
-            <Toggle checked={settingsForm.notifyRequests} onChange={(v) => setSettingsForm((f) => ({ ...f, notifyRequests: v }))} label="Новые заявки" />
-            <Toggle checked={settingsForm.notifyReviews} onChange={(v) => setSettingsForm((f) => ({ ...f, notifyReviews: v }))} label="Новые отзывы" />
-            <Toggle checked={settingsForm.notifyOrders} onChange={(v) => setSettingsForm((f) => ({ ...f, notifyOrders: v }))} label="Действия по заказам" />
-            <Toggle checked={settingsForm.notifyChat} onChange={(v) => setSettingsForm((f) => ({ ...f, notifyChat: v }))} label="Чат с клиентами" />
+            <Toggle checked={settingsForm.notifyRequests} onChange={(v) => setSettingsForm((f) => ({ ...f, notifyRequests: v }))} label={t("Новые заявки")} />
+            <Toggle checked={settingsForm.notifyReviews} onChange={(v) => setSettingsForm((f) => ({ ...f, notifyReviews: v }))} label={t("Новые отзывы")} />
+            <Toggle checked={settingsForm.notifyOrders} onChange={(v) => setSettingsForm((f) => ({ ...f, notifyOrders: v }))} label={t("Действия по заказам")} />
+            <Toggle checked={settingsForm.notifyChat} onChange={(v) => setSettingsForm((f) => ({ ...f, notifyChat: v }))} label={t("Чат с клиентами")} />
           </div>
-          <p className="muted">Уведомления от Telegram-бота — донастроим отдельно.</p>
+          <p className="muted">{t("Уведомления от Telegram-бота — донастроим отдельно.")}</p>
         </div>
 
         <div className="tms-section">
-          <p className="tms-section-label">Язык приложения</p>
-          <div className="tms-chip-wrap">
-            {APP_LANGUAGES.map((l) => <Chip key={l} label={l} active={settingsForm.appLanguage === l} onClick={() => setSettingsForm((f) => ({ ...f, appLanguage: l }))} />)}
-          </div>
+          <p className="tms-section-label">{t("Поддержка")}</p>
+          <button className="tms-link-row" onClick={() => navigate("provider-support")}>{t("Написать в поддержку →")}</button>
         </div>
 
         <div className="tms-section">
-          <p className="tms-section-label">Поддержка</p>
-          <button className="tms-link-row" onClick={() => navigate("provider-support")}>Написать в поддержку →</button>
-        </div>
-
-        <div className="tms-section">
-          <p className="tms-section-label">Опасная зона</p>
+          <p className="tms-section-label">{t("Опасная зона")}</p>
           {!showDeleteConfirm ? (
-            <button className="tms-decline-btn" onClick={() => setShowDeleteConfirm(true)}>Удалить аккаунт</button>
+            <button className="tms-decline-btn" onClick={() => setShowDeleteConfirm(true)}>{t("Удалить аккаунт")}</button>
           ) : (
             <div className="tms-profile-card">
-              <p className="tms-body-text">Все данные анкеты, заявки и отзывы будут удалены безвозвратно. Продолжить?</p>
+              <p className="tms-body-text">{t("Все данные анкеты, заявки и отзывы будут удалены безвозвратно. Продолжить?")}</p>
               <div className="tms-offer-actions">
-                <button className="tms-decline-btn" onClick={confirmDeleteAccount}>Да, удалить</button>
-                <button className="tms-select-btn" onClick={() => setShowDeleteConfirm(false)}>Отмена</button>
+                <button className="tms-decline-btn" onClick={confirmDeleteAccount}>{t("Да, удалить")}</button>
+                <button className="tms-select-btn" onClick={() => setShowDeleteConfirm(false)}>{t("Отмена")}</button>
               </div>
             </div>
           )}
@@ -1752,15 +2028,16 @@ export default function TbilisiMiniApp() {
     return (
       <div className="tms-screen" style={{ paddingBottom: 8 }}>
         <div className="tms-section" style={{ marginTop: 0 }}>
-          <p className="muted">Опишите проблему или предложение — сообщение придёт в поддержку.</p>
+          <p className="muted">{t("Опишите проблему или предложение — сообщение придёт в поддержку.")}</p>
         </div>
-        <ChatThread messages={supportMessages} />
+        <ChatThread messages={supportMessages} t={t} />
       </div>
     );
   }
 
   function render() {
     switch (screen) {
+      case "language": return renderLanguage();
       case "role": return renderRole();
       case "client-home": return renderClientHome();
       case "client-services": return renderClientServices();
@@ -1797,55 +2074,56 @@ export default function TbilisiMiniApp() {
   }
 
   const TITLES = {
-    role: "Мастера · Тбилиси",
-    "client-home": "Категории",
-    "client-services": "Выбор услуги",
-    "client-request": "Новая заявка",
-    "client-matches": "Подходящие мастера",
-    "client-dashboard": "Личный кабинет",
-    "client-my-requests": "Мои заявки",
-    "client-request-detail": "Заявка",
-    "client-offers-all": "Предложения",
-    "client-provider-view": "Мастер",
-    "client-my-orders": "Мои заказы",
-    "client-order-detail": "Заказ",
-    "client-review": "Отзыв о мастере",
-    "client-profile": "Профиль",
-    "client-support": "Поддержка",
-    "provider-register": "Регистрация мастера",
-    "provider-dashboard": "Личный кабинет",
-    "provider-requests": "Заявки",
-    "provider-orders": "Заказы",
-    "provider-order-detail": "Заказ",
-    "provider-messages": "Сообщения",
-    "provider-offer": "Ваш отклик",
-    "provider-profile-cabinet": "Профиль",
-    "provider-more": "Ещё",
-    "provider-analytics": "Аналитика",
-    "provider-reviews": "Отзывы",
-    "provider-reviews-all": "Все отзывы",
-    "provider-finance": "Финансы",
-    "provider-subscription": "Подписка",
-    "provider-settings": "Настройки",
-    "provider-support": "Поддержка",
+    language: t("Выберите язык"),
+    role: t("Мастера · Тбилиси"),
+    "client-home": t("Категории"),
+    "client-services": t("Выбор услуги"),
+    "client-request": t("Новая заявка"),
+    "client-matches": t("Подходящие мастера"),
+    "client-dashboard": t("Личный кабинет"),
+    "client-my-requests": t("Мои заявки"),
+    "client-request-detail": t("Заявка"),
+    "client-offers-all": t("Предложения"),
+    "client-provider-view": t("Мастер"),
+    "client-my-orders": t("Мои заказы"),
+    "client-order-detail": t("Заказ"),
+    "client-review": t("Отзыв о мастере"),
+    "client-profile": t("Профиль"),
+    "client-support": t("Поддержка"),
+    "provider-register": t("Регистрация мастера"),
+    "provider-dashboard": t("Личный кабинет"),
+    "provider-requests": t("Заявки"),
+    "provider-orders": t("Заказы"),
+    "provider-order-detail": t("Заказ"),
+    "provider-messages": t("Сообщения"),
+    "provider-offer": t("Ваш отклик"),
+    "provider-profile-cabinet": t("Профиль"),
+    "provider-more": t("Ещё"),
+    "provider-analytics": t("Аналитика"),
+    "provider-reviews": t("Отзывы"),
+    "provider-reviews-all": t("Все отзывы"),
+    "provider-finance": t("Финансы"),
+    "provider-subscription": t("Подписка"),
+    "provider-settings": t("Настройки"),
+    "provider-support": t("Поддержка"),
   };
 
   function bottomBarConfig() {
     switch (screen) {
       case "client-request":
-        return { label: loading ? "Отправляю…" : "Отправить заявку", disabled: loading || !(form.district && form.urgency), onClick: submitRequest };
+        return { label: loading ? t("Отправляю…") : t("Отправить заявку"), disabled: loading || !(form.district && form.urgency), onClick: submitRequest };
       case "client-matches":
-        return { label: "Готово", disabled: false, onClick: () => goTab("client-dashboard") };
+        return { label: t("Готово"), disabled: false, onClick: () => goTab("client-dashboard") };
       case "client-review":
-        return { label: loading ? "Сохраняю…" : "Оставить отзыв и завершить", disabled: loading, onClick: submitReview };
+        return { label: loading ? t("Сохраняю…") : t("Оставить отзыв и завершить"), disabled: loading, onClick: submitReview };
       case "provider-offer":
-        return { label: loading ? "Отправляю…" : "Отправить отклик", disabled: loading || !offerForm.price, onClick: submitOffer };
+        return { label: loading ? t("Отправляю…") : t("Отправить отклик"), disabled: loading || !offerForm.price, onClick: submitOffer };
       case "provider-register": {
         let hint;
-        if (providerForm.serviceIds.length === 0) hint = "Выберите хотя бы одну услугу";
-        else if (providerForm.areas.length === 0) hint = "Выберите хотя бы один район работы";
+        if (providerForm.serviceIds.length === 0) hint = t("Выберите хотя бы одну услугу");
+        else if (providerForm.areas.length === 0) hint = t("Выберите хотя бы один район работы");
         return {
-          label: loading ? "Регистрирую…" : "Зарегистрироваться",
+          label: loading ? t("Регистрирую…") : t("Зарегистрироваться"),
           disabled: loading || !(providerForm.serviceIds.length > 0 && providerForm.areas.length > 0),
           onClick: submitProviderRegister,
           hint,
@@ -1876,9 +2154,9 @@ export default function TbilisiMiniApp() {
 
   let bottomArea = null;
   if (screen === "provider-support" || screen === "client-support") {
-    bottomArea = <ChatInputBar value={supportDraft} onChange={setSupportDraft} onSend={sendSupportMessage} />;
+    bottomArea = <ChatInputBar value={supportDraft} onChange={setSupportDraft} onSend={sendSupportMessage} t={t} />;
   } else if (TAB_BAR_SCREENS.has(screen)) {
-    const tabs = screen.startsWith("client-") ? CLIENT_TABS : PROVIDER_TABS;
+    const tabs = (screen.startsWith("client-") ? CLIENT_TABS : PROVIDER_TABS).map((it) => ({ ...it, label: t(it.label) }));
     bottomArea = <TabBar items={tabs} active={screen} onNavigate={handleTabNavigate} />;
   } else if (bb.label) {
     bottomArea = <BottomBar label={bb.label} disabled={bb.disabled} onClick={bb.onClick} hint={bb.hint} />;
@@ -2042,7 +2320,7 @@ export default function TbilisiMiniApp() {
         .tms-starpicker-btn { border: none; background: transparent; font-size: 32px; line-height: 1; padding: 0; cursor: pointer; color: #D9A441; }
       `}</style>
       <div className="tms-phone">
-        <Header title={TITLES[screen]} onBack={showBack ? goBack : null} onClose={goHome} />
+        <Header title={TITLES[screen]} onBack={showBack ? goBack : null} onClose={goHome} t={t} />
         <div className="tms-body">{render()}</div>
         {bottomArea}
       </div>
