@@ -422,6 +422,16 @@ export default function TbilisiMiniApp() {
     });
   }
 
+  // Клиент удаляет свою заявку, пока к ней не выбран мастер — уходит в архив,
+  // не в статистику и не в ленту мастеров (см. backend requestsService.archive).
+  async function archiveRequest(request) {
+    await withLoading(async () => {
+      await api(`/requests/${request.id}/archive`, { method: "PUT", body: JSON.stringify({ telegramId: tgUser.id }) });
+      await loadMyRequests();
+      goTab("client-my-requests");
+    });
+  }
+
   async function viewProvider(providerId) {
     await withLoading(async () => setViewedProvider(await api(`/providers/${providerId}`)));
     navigate("client-provider-view");
@@ -835,7 +845,7 @@ export default function TbilisiMiniApp() {
   }
 
   function renderClientDashboard() {
-    const activeRequests = myRequests.filter((r) => r.status === "open");
+    const activeRequests = myRequests.filter((r) => r.status === "open" && !r.archived);
     const inWorkRequests = myRequests.filter((r) => r.status === "matched" && !locallyCompletedRequestIds.has(r.id));
     return (
       <div className="tms-screen">
@@ -857,7 +867,8 @@ export default function TbilisiMiniApp() {
   }
 
   function renderClientMyRequests() {
-    const openList = myRequests.filter((r) => r.status === "open");
+    const openList = myRequests.filter((r) => r.status === "open" && !r.archived);
+    const archivedList = myRequests.filter((r) => r.archived);
     return (
       <div className="tms-screen">
         <div className="tms-section" style={{ marginTop: 4 }}><p className="tms-section-label">Мои заявки</p></div>
@@ -877,6 +888,22 @@ export default function TbilisiMiniApp() {
           ))}
           {openList.length === 0 && <p className="muted">Активных заявок пока нет.</p>}
         </div>
+        {archivedList.length > 0 && (
+          <details className="tms-archive">
+            <summary>Архив заявок ({archivedList.length})</summary>
+            <div className="tms-provider-list" style={{ marginTop: 10 }}>
+              {archivedList.map((r) => (
+                <div key={r.id} className="tms-provider-row">
+                  <div className="tms-provider-info" style={{ flex: 1 }}>
+                    <span className="tms-provider-name">{r.description || r.service.name}</span>
+                    <span className="tms-provider-meta">{r.area || "район не указан"} · удалена</span>
+                  </div>
+                  <button className="tms-decline-btn" onClick={() => openRequestDetail(r)}>Открыть</button>
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
       </div>
     );
   }
@@ -898,20 +925,33 @@ export default function TbilisiMiniApp() {
           </div>
         </div>
         <div className="tms-section">
-          <p className="tms-section-label">Статус: {r.status === "open" ? "поиск мастера" : r.status === "matched" ? "мастер выбран" : r.status}</p>
+          <p className="tms-section-label">Статус: {r.archived ? "в архиве" : r.status === "open" ? "поиск мастера" : r.status === "matched" ? "мастер выбран" : r.status}</p>
         </div>
-        <div className="tms-section">
-          <p className="tms-section-label">Предложения ({r.offers.length})</p>
-          <div className="tms-offer-list">{r.offers.map((o) => renderOfferRow(o))}</div>
-          {r.offers.length === 0 && <p className="muted">Пока никто не откликнулся.</p>}
-        </div>
+        {r.archived ? (
+          <div className="tms-section">
+            <p className="muted">Заявка удалена и перенесена в архив — не участвует в статистике и не видна мастерам.</p>
+          </div>
+        ) : (
+          <>
+            <div className="tms-section">
+              <p className="tms-section-label">Предложения ({r.offers.length})</p>
+              <div className="tms-offer-list">{r.offers.map((o) => renderOfferRow(o))}</div>
+              {r.offers.length === 0 && <p className="muted">Пока никто не откликнулся.</p>}
+            </div>
+            {r.status === "open" && (
+              <div className="tms-section">
+                <button className="tms-decline-btn" onClick={() => archiveRequest(r)}>Удалить заявку</button>
+              </div>
+            )}
+          </>
+        )}
       </div>
     );
   }
 
   function renderClientOffersAll() {
     const pending = myRequests
-      .filter((r) => r.status === "open")
+      .filter((r) => r.status === "open" && !r.archived)
       .flatMap((r) => r.offers.filter((o) => o.status === "pending").map((o) => ({ ...o, request: r })));
     return (
       <div className="tms-screen">
@@ -1986,6 +2026,8 @@ export default function TbilisiMiniApp() {
         .tms-review-top { display: flex; align-items: center; justify-content: space-between; }
         .tms-review-text { font-size: 13px; margin: 0; }
         .tms-inprogress-note { font-size: 11px; color: var(--muted); background: var(--card); border: 1px dashed var(--line); border-radius: 10px; padding: 8px 10px; margin: 4px 0 0; }
+        .tms-archive { margin-top: 22px; }
+        .tms-archive summary { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 500; cursor: pointer; }
         .tms-chat-thread { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
         .tms-chat-bubble { max-width: 78%; border-radius: 14px; padding: 9px 12px; display: flex; flex-direction: column; gap: 3px; }
         .tms-chat-bubble.is-client { align-self: flex-start; background: var(--card); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
