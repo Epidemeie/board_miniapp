@@ -402,6 +402,9 @@ const TAB_BAR_SCREENS = new Set([
    Telegram: кто открыл Mini App
 --------------------------------------------------------------- */
 
+const TELEGRAM_BOT_URL = "https://t.me/goservicesbot";
+const LOCAL_DEV_HOSTS = new Set(["localhost", "127.0.0.1"]);
+
 function getTelegramUser() {
   const tg = typeof window !== "undefined" ? window.Telegram?.WebApp : null;
   tg?.ready?.();
@@ -415,7 +418,17 @@ function getTelegramUser() {
       photoUrl: u.photo_url || null,
     };
   }
-  // Фоллбэк для тестирования вне Telegram (обычный браузер)
+
+  const isLocalDev = typeof window !== "undefined" && LOCAL_DEV_HOSTS.has(window.location.hostname);
+  if (!isLocalDev) {
+    // Открыто не из Telegram (обычный браузер на проде) — initData нет,
+    // подтянуть настоящего пользователя неоткуда. Вместо гостя отправляем
+    // открыть приложение через бота, где Telegram сам передаст initData.
+    if (typeof window !== "undefined") window.location.replace(TELEGRAM_BOT_URL);
+    return { id: null, name: "Гость", username: undefined, photoUrl: null };
+  }
+
+  // Фоллбэк для тестирования вне Telegram на localhost (обычный браузер)
   let demoId = sessionStorage.getItem("demo_telegram_id");
   if (!demoId) {
     demoId = "demo-" + Math.random().toString(36).slice(2, 10);
@@ -652,6 +665,9 @@ export default function TbilisiMiniApp() {
   }
 
   useEffect(() => {
+    // tgUser.id === null — идёт редирект в Telegram (см. getTelegramUser),
+    // запрашивать нечего, страница вот-вот уйдёт со своего домена
+    if (!tgUser.id) return;
     const cached = localStorage.getItem("app_language");
     api(`/users/prefs/${tgUser.id}`)
       .then(async (res) => {
@@ -951,7 +967,9 @@ export default function TbilisiMiniApp() {
   async function loadProviderInbox(prov) {
     const serviceIds = (prov.services || []).map((s) => s.serviceId ?? s.service?.id).filter(Boolean);
     const [open, offers] = await Promise.all([
-      serviceIds.length ? api(`/requests/open?serviceId=${serviceIds.join(",")}`) : Promise.resolve([]),
+      serviceIds.length
+        ? api(`/requests/open?serviceId=${serviceIds.join(",")}&telegramId=${tgUser.id}`)
+        : Promise.resolve([]),
       api(`/offers/mine?providerId=${prov.id}`),
     ]);
     setOpenRequests(open);
