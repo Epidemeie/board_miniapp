@@ -38,8 +38,6 @@ const RU_TO_EN = {
   "Грузинский": "Georgian",
   "Назад": "Back",
   "Отправить": "Send",
-  "Написать сообщение…": "Write a message…",
-  "Сообщений пока нет.": "No messages yet.",
   "звёзд": "stars",
   "Загрузка…": "Loading…",
   "Открыть": "Open",
@@ -257,7 +255,13 @@ const RU_TO_EN = {
   "Уведомления от Telegram-бота — донастроим отдельно.": "Telegram bot notifications — will be configured separately.",
   "Профиль будет скрыт и станет неактивным — вы пропадёте из ленты клиентов и подбора мастеров. Анкета, отклики, рейтинг и отзывы не удаляются и вернутся, если вы снова выберете «Я мастер». Продолжить?":
     "Your profile will be hidden and deactivated — you'll disappear from clients' feed and matching. Your profile, offers, rating and reviews aren't deleted and will come back if you pick \"I'm a pro\" again. Continue?",
-  "Опишите проблему или предложение — сообщение придёт в поддержку.": "Describe a problem or a suggestion — the message will reach support.",
+  "Опишите проблему или предложение — обращение придёт в поддержку.": "Describe a problem or a suggestion — it'll reach support.",
+  "Обращение №": "Ticket #",
+  "отправлено — мы свяжемся с вами.": "sent — we'll get back to you.",
+  "Тема (необязательно)": "Subject (optional)",
+  "Например: вопрос по заявке": "E.g. a question about a request",
+  "Сообщение": "Message",
+  "Опишите проблему или предложение": "Describe the problem or suggestion",
   // Заголовки экранов
   "Заказ": "Order",
   "Услуги · Тбилиси": "Services · Tbilisi",
@@ -595,20 +599,6 @@ function ReviewRow({ review }) {
   );
 }
 
-function ChatThread({ messages, t = (s) => s }) {
-  return (
-    <div className="tms-chat-thread">
-      {messages.map((m, i) => (
-        <div key={i} className={`tms-chat-bubble ${m.from === "me" ? "is-me" : "is-client"}`}>
-          <p className="tms-chat-text">{m.text}</p>
-          <span className="tms-chat-time">{m.time}</span>
-        </div>
-      ))}
-      {messages.length === 0 && <p className="muted">{t("Сообщений пока нет.")}</p>}
-    </div>
-  );
-}
-
 function StarPicker({ value, onChange, t = (s) => s }) {
   return (
     <div className="tms-starpicker">
@@ -617,16 +607,6 @@ function StarPicker({ value, onChange, t = (s) => s }) {
           {n <= value ? "★" : "☆"}
         </button>
       ))}
-    </div>
-  );
-}
-
-function ChatInputBar({ value, onChange, onSend, t = (s) => s }) {
-  return (
-    <div className="tms-chatbar">
-      <input className="tms-chatbar-input" placeholder={t("Написать сообщение…")} value={value}
-        onChange={(e) => onChange(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") onSend(); }} />
-      <button className="tms-chatbar-send" onClick={onSend} disabled={!value.trim()} aria-label={t("Отправить")}>➤</button>
     </div>
   );
 }
@@ -751,8 +731,8 @@ export default function TbilisiMiniApp() {
     notifyChat: true,
   });
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [supportMessages, setSupportMessages] = useState([]);
-  const [supportDraft, setSupportDraft] = useState("");
+  const [supportForm, setSupportForm] = useState({ subject: "", text: "" });
+  const [supportTicket, setSupportTicket] = useState(null);
 
   function navigate(next) {
     setError(null);
@@ -1183,10 +1163,24 @@ export default function TbilisiMiniApp() {
     });
   }
 
-  function sendSupportMessage() {
-    if (!supportDraft.trim()) return;
-    setSupportMessages((m) => [...m, { from: "me", text: supportDraft.trim(), time: "сейчас" }]);
-    setSupportDraft("");
+  async function submitSupportTicket() {
+    if (!supportForm.text.trim()) return;
+    await withLoading(async () => {
+      const role = screen === "provider-support" ? "provider" : "client";
+      const ticket = await api("/support", {
+        method: "POST",
+        body: JSON.stringify({
+          telegramId: tgUser.id,
+          name: tgUser.name,
+          username: tgUser.username,
+          role,
+          subject: supportForm.subject.trim() || undefined,
+          text: supportForm.text.trim(),
+        }),
+      });
+      setSupportTicket(ticket);
+      setSupportForm({ subject: "", text: "" });
+    });
   }
 
   // Мягкое удаление — зеркало confirmDeleteClientAccount, см. providersService.deactivate.
@@ -2392,13 +2386,32 @@ export default function TbilisiMiniApp() {
     );
   }
 
-  function renderSupportChat() {
+  function renderSupportForm() {
     return (
-      <div className="tms-screen" style={{ paddingBottom: 8 }}>
-        <div className="tms-section" style={{ marginTop: 0 }}>
-          <p className="muted">{t("Опишите проблему или предложение — сообщение придёт в поддержку.")}</p>
+      <div className="tms-screen">
+        <div className="tms-section" style={{ marginTop: 4 }}>
+          <p className="muted">{t("Опишите проблему или предложение — обращение придёт в поддержку.")}</p>
         </div>
-        <ChatThread messages={supportMessages} t={t} />
+        {supportTicket && (
+          <div className="tms-section">
+            <p className="tms-success">
+              {t("Обращение №")}{supportTicket.id} {t("отправлено — мы свяжемся с вами.")}
+            </p>
+          </div>
+        )}
+        <div className="tms-section">
+          <label className="tms-field">
+            <span>{t("Тема (необязательно)")}</span>
+            <input className="tms-field-input" placeholder={t("Например: вопрос по заявке")}
+              value={supportForm.subject} onChange={(e) => setSupportForm((f) => ({ ...f, subject: e.target.value }))} />
+          </label>
+        </div>
+        <div className="tms-section">
+          <p className="tms-section-label">{t("Сообщение")}</p>
+          <textarea className="tms-textarea" rows={5} placeholder={t("Опишите проблему или предложение")}
+            value={supportForm.text} onChange={(e) => setSupportForm((f) => ({ ...f, text: e.target.value }))} />
+        </div>
+        {error && <p className="tms-error">{error}</p>}
       </div>
     );
   }
@@ -2422,7 +2435,7 @@ export default function TbilisiMiniApp() {
       case "client-reviews": return renderClientReviews(false);
       case "client-reviews-all": return renderClientReviews(true);
       case "client-profile": return renderClientProfile();
-      case "client-support": return renderSupportChat();
+      case "client-support": return renderSupportForm();
       case "provider-register": return renderProviderRegister();
       case "provider-dashboard": return renderProviderDashboard();
       case "provider-requests": return renderProviderRequests();
@@ -2439,7 +2452,7 @@ export default function TbilisiMiniApp() {
       case "provider-finance": return renderProviderFinance();
       case "provider-subscription": return renderProviderSubscription();
       case "provider-settings": return renderProviderSettings();
-      case "provider-support": return renderSupportChat();
+      case "provider-support": return renderSupportForm();
       default: return null;
     }
   }
@@ -2494,6 +2507,9 @@ export default function TbilisiMiniApp() {
         return { label: loading ? t("Отправляю…") : t("Отправить отклик"), disabled: loading || !offerForm.price, onClick: submitOffer };
       case "provider-client-review":
         return { label: loading ? t("Сохраняю…") : t("Оставить отзыв"), disabled: loading, onClick: submitClientReview };
+      case "client-support":
+      case "provider-support":
+        return { label: loading ? t("Отправляю…") : t("Отправить"), disabled: loading || !supportForm.text.trim(), onClick: submitSupportTicket };
       case "provider-register": {
         let hint;
         if (providerForm.serviceIds.length === 0) hint = t("Выберите хотя бы одну услугу");
@@ -2529,9 +2545,7 @@ export default function TbilisiMiniApp() {
   const showBack = history.length > 0;
 
   let bottomArea = null;
-  if (screen === "provider-support" || screen === "client-support") {
-    bottomArea = <ChatInputBar value={supportDraft} onChange={setSupportDraft} onSend={sendSupportMessage} t={t} />;
-  } else if (TAB_BAR_SCREENS.has(screen)) {
+  if (TAB_BAR_SCREENS.has(screen)) {
     const tabs = (screen.startsWith("client-") ? CLIENT_TABS : PROVIDER_TABS).map((it) => ({ ...it, label: t(it.label) }));
     bottomArea = <TabBar items={tabs} active={screen} onNavigate={handleTabNavigate} />;
   } else if (bb.label) {
@@ -2627,6 +2641,7 @@ export default function TbilisiMiniApp() {
         .tms-mainbutton { width: 100%; border: none; border-radius: 12px; background: var(--ink); color: var(--paper); padding: 14px; font-size: 14px; font-weight: 600; cursor: pointer; }
         .tms-mainbutton:disabled { background: var(--line); color: var(--muted); cursor: default; }
         .tms-error { color: #B4532F; font-size: 12.5px; margin-top: 8px; }
+        .tms-success { color: #2F7A4D; font-size: 12.5px; margin-top: 0; }
         .muted { color: var(--muted); font-size: 12.5px; margin-top: 8px; }
         .tms-body-text { font-size: 14px; line-height: 1.5; margin: 0; }
 
@@ -2686,16 +2701,6 @@ export default function TbilisiMiniApp() {
         .tms-inprogress-note { font-size: 11px; color: var(--muted); background: var(--card); border: 1px dashed var(--line); border-radius: 10px; padding: 8px 10px; margin: 4px 0 0; }
         .tms-archive { margin-top: 22px; }
         .tms-archive summary { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 500; cursor: pointer; }
-        .tms-chat-thread { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
-        .tms-chat-bubble { max-width: 78%; border-radius: 14px; padding: 9px 12px; display: flex; flex-direction: column; gap: 3px; }
-        .tms-chat-bubble.is-client { align-self: flex-start; background: var(--card); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
-        .tms-chat-bubble.is-me { align-self: flex-end; background: var(--ink); color: var(--paper); border-bottom-right-radius: 4px; }
-        .tms-chat-text { font-size: 13.5px; margin: 0; }
-        .tms-chat-time { font-size: 10px; opacity: 0.6; align-self: flex-end; }
-        .tms-chatbar { display: flex; gap: 8px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--paper); flex-shrink: 0; }
-        .tms-chatbar-input { flex: 1; border: 1px solid var(--line); border-radius: 20px; padding: 10px 14px; font-size: 13.5px; background: var(--card); color: var(--ink); }
-        .tms-chatbar-send { width: 38px; height: 38px; border-radius: 50%; border: none; background: var(--ink); color: var(--paper); cursor: pointer; flex-shrink: 0; }
-        .tms-chatbar-send:disabled { background: var(--line); color: var(--muted); }
         .tms-starpicker { display: flex; gap: 6px; }
         .tms-starpicker-btn { border: none; background: transparent; font-size: 32px; line-height: 1; padding: 0; cursor: pointer; color: #D9A441; }
       `}</style>
