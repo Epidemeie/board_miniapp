@@ -37,7 +37,6 @@ const RU_TO_EN = {
   "Английский": "English",
   "Грузинский": "Georgian",
   "Назад": "Back",
-  "Начать заново": "Start over",
   "Отправить": "Send",
   "Написать сообщение…": "Write a message…",
   "Сообщений пока нет.": "No messages yet.",
@@ -478,12 +477,12 @@ function MatchRing({ score, size = 44, stroke = 4 }) {
   );
 }
 
-function Header({ title, onBack, onClose, t = (s) => s }) {
+function Header({ title, onBack, t = (s) => s }) {
   return (
     <div className="tms-header">
       {onBack ? <button className="tms-header-btn" onClick={onBack} aria-label={t("Назад")}>←</button> : <span className="tms-header-spacer" />}
       <span className="tms-header-title">{title}</span>
-      <button className="tms-header-btn" onClick={onClose} aria-label={t("Начать заново")}>✕</button>
+      <span className="tms-header-spacer" />
     </div>
   );
 }
@@ -2676,7 +2675,7 @@ export default function TbilisiMiniApp() {
         .tms-starpicker-btn { border: none; background: transparent; font-size: 32px; line-height: 1; padding: 0; cursor: pointer; color: #D9A441; }
       `}</style>
       <div className="tms-phone">
-        <Header title={TITLES[screen]} onBack={showBack ? goBack : null} onClose={goHome} t={t} />
+        <Header title={TITLES[screen]} onBack={showBack ? goBack : null} t={t} />
         <div className="tms-body">{render()}</div>
         {bottomArea}
       </div>
