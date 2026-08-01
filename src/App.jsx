@@ -637,10 +637,6 @@ export default function TbilisiMiniApp() {
   const [selectedClientOrderId, setSelectedClientOrderId] = useState(null);
   const [reviewTargetRequestId, setReviewTargetRequestId] = useState(null);
   const [reviewForm, setReviewForm] = useState({ rating: 5, text: "" });
-  // Публичного эндпоинта «завершить заказ» на backend пока нет (только admin) —
-  // фактическое завершение и отзыв (POST /reviews) реальны, а статус заказа
-  // «завершён» до появления такого эндпоинта отслеживаем локально в сессии.
-  const [locallyCompletedRequestIds, setLocallyCompletedRequestIds] = useState(() => new Set());
   const [submittedReviews, setSubmittedReviews] = useState({});
   const [clientSettingsForm, setClientSettingsForm] = useState({
     name: tgUser.name,
@@ -840,7 +836,7 @@ export default function TbilisiMiniApp() {
         }),
       });
       setSubmittedReviews((m) => ({ ...m, [request.id]: { rating: reviewForm.rating, text: reviewForm.text } }));
-      setLocallyCompletedRequestIds((s) => new Set(s).add(request.id));
+      await loadMyRequests();
       goTab("client-my-orders");
     });
   }
@@ -1241,7 +1237,7 @@ export default function TbilisiMiniApp() {
 
   function renderClientDashboard() {
     const activeRequests = myRequests.filter((r) => r.status === "open" && !r.archived);
-    const inWorkRequests = myRequests.filter((r) => r.status === "matched" && !locallyCompletedRequestIds.has(r.id));
+    const inWorkRequests = myRequests.filter((r) => r.status === "matched");
     return (
       <div className="tms-screen">
         <div className="tms-hero">
@@ -1392,7 +1388,7 @@ export default function TbilisiMiniApp() {
       <button key={r.id} className="tms-order-card" onClick={() => openClientOrder(r)}>
         <div className="tms-provider-info" style={{ flex: 1 }}>
           <span className="tms-provider-name">{offer?.provider.user.name || t("Мастер")}{offer ? ` · ★${offer.provider.rating.toFixed(1)}` : ""}</span>
-          <span className="tms-provider-meta">{t(r.service.name)}{locallyCompletedRequestIds.has(r.id) ? ` ${t("· Завершён")}` : ""}</span>
+          <span className="tms-provider-meta">{t(r.service.name)}{r.status === "completed" ? ` ${t("· Завершён")}` : ""}</span>
         </div>
         <span className="tms-offer-terms">{offer?.price ?? r.budget} ₾</span>
         <span className="tms-chevron">→</span>
@@ -1401,8 +1397,8 @@ export default function TbilisiMiniApp() {
   }
 
   function renderClientMyOrders() {
-    const inWork = myRequests.filter((r) => r.status === "matched" && !locallyCompletedRequestIds.has(r.id));
-    const history = myRequests.filter((r) => r.status === "matched" && locallyCompletedRequestIds.has(r.id));
+    const inWork = myRequests.filter((r) => r.status === "matched");
+    const history = myRequests.filter((r) => r.status === "completed");
     return (
       <div className="tms-screen">
         <div className="tms-section" style={{ marginTop: 4 }}>
@@ -1427,7 +1423,7 @@ export default function TbilisiMiniApp() {
     const r = myRequests.find((x) => x.id === selectedClientOrderId);
     if (!r) return null;
     const offer = r.offers.find((o) => o.status === "accepted");
-    const isCompleted = locallyCompletedRequestIds.has(r.id);
+    const isCompleted = r.status === "completed";
     const review = submittedReviews[r.id];
     return (
       <div className="tms-screen">
