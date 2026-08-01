@@ -167,7 +167,8 @@ const RU_TO_EN = {
   // Профиль клиента
   "Заявки взяты в работу": "Requests taken into work",
   "Чат с мастерами": "Chat with pros",
-  "Все ваши заявки и отзывы будут удалены безвозвратно. Продолжить?": "All your requests and reviews will be permanently deleted. Continue?",
+  "Профиль будет скрыт и станет неактивным — вы выйдете из личного кабинета, а заявки пропадут из ленты мастеров. Заявки, отзывы и рейтинг не удаляются и вернутся, если вы снова выберете «Я клиент». Продолжить?":
+    "Your profile will be hidden and deactivated — you'll be logged out of your account, and your requests will disappear from pros' feed. Requests, reviews and rating aren't deleted and will come back if you pick \"I'm a client\" again. Continue?",
   // Рейтинг клиента (симметрично рейтингу мастера)
   "Мой рейтинг": "My rating",
   "Отзывы обо мне от мастеров →": "Reviews about me from pros →",
@@ -253,7 +254,8 @@ const RU_TO_EN = {
   "Новые отзывы": "New reviews",
   "Действия по заказам": "Order actions",
   "Уведомления от Telegram-бота — донастроим отдельно.": "Telegram bot notifications — will be configured separately.",
-  "Все данные анкеты, заявки и отзывы будут удалены безвозвратно. Продолжить?": "All profile data, requests and reviews will be permanently deleted. Continue?",
+  "Профиль будет скрыт и станет неактивным — вы пропадёте из ленты клиентов и подбора мастеров. Анкета, отклики, рейтинг и отзывы не удаляются и вернутся, если вы снова выберете «Я мастер». Продолжить?":
+    "Your profile will be hidden and deactivated — you'll disappear from clients' feed and matching. Your profile, offers, rating and reviews aren't deleted and will come back if you pick \"I'm a pro\" again. Continue?",
   "Опишите проблему или предложение — сообщение придёт в поддержку.": "Describe a problem or a suggestion — the message will reach support.",
   // Заголовки экранов
   "Заказ": "Order",
@@ -636,8 +638,13 @@ export default function TbilisiMiniApp() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Возвращает промис (а не «выстрелил и забыл») — pickClient/pickProvider
+  // дожидаются её перед входом в кабинет, т.к. с этим же запросом backend
+  // тихо реактивирует профиль, если он был деактивирован кнопкой «Удалить
+  // аккаунт» (см. usersService.setPrefs) — без ожидания есть риск прочитать
+  // ещё не реактивированный профиль.
   function persistPrefs(partial) {
-    api("/users/prefs", {
+    return api("/users/prefs", {
       method: "PUT",
       body: JSON.stringify({ telegramId: tgUser.id, name: tgUser.name, username: tgUser.username, ...partial }),
     }).catch(() => {});
@@ -810,8 +817,8 @@ export default function TbilisiMiniApp() {
   // В отличие от chooseClient/chooseProvider (которые просто открывают
   // кабинет — используются и при автовходе по сохранённому entryRole),
   // здесь ещё и запоминаем выбор как предпочтение входа на будущее.
-  function pickClient() {
-    persistPrefs({ entryRole: "client" });
+  async function pickClient() {
+    await persistPrefs({ entryRole: "client" });
     return chooseClient();
   }
 
@@ -915,9 +922,18 @@ export default function TbilisiMiniApp() {
     });
   }
 
-  function confirmDeleteClientAccount() {
-    setClientShowDeleteConfirm(false);
-    goHome();
+  // Мягкое удаление — профиль и рейтинг остаются на backend (см.
+  // usersService.deactivate), просто скрываются из выдачи. Реактивация
+  // происходит прозрачно при следующем pickClient() — отдельной кнопки
+  // «восстановить» нет.
+  async function confirmDeleteClientAccount() {
+    await withLoading(async () => {
+      await api("/users/deactivate", { method: "PUT", body: JSON.stringify({ telegramId: tgUser.id }) });
+      setClientShowDeleteConfirm(false);
+      setClientProfile(null);
+      setMyRequests([]);
+      goHome();
+    });
   }
 
   // ---- Роль: мастер ----
@@ -963,8 +979,8 @@ export default function TbilisiMiniApp() {
     });
   }
 
-  function pickProvider() {
-    persistPrefs({ entryRole: "provider" });
+  async function pickProvider() {
+    await persistPrefs({ entryRole: "provider" });
     return chooseProvider();
   }
 
@@ -1154,10 +1170,14 @@ export default function TbilisiMiniApp() {
     setSupportDraft("");
   }
 
-  function confirmDeleteAccount() {
-    setShowDeleteConfirm(false);
-    setProvider(null);
-    goHome();
+  // Мягкое удаление — зеркало confirmDeleteClientAccount, см. providersService.deactivate.
+  async function confirmDeleteAccount() {
+    await withLoading(async () => {
+      await api(`/providers/${provider.id}/deactivate`, { method: "PUT", body: JSON.stringify({ telegramId: tgUser.id }) });
+      setShowDeleteConfirm(false);
+      setProvider(null);
+      goHome();
+    });
   }
 
   function renderLanguage() {
@@ -1680,7 +1700,7 @@ export default function TbilisiMiniApp() {
             <button className="tms-decline-btn" onClick={() => setClientShowDeleteConfirm(true)}>{t("Удалить аккаунт")}</button>
           ) : (
             <div className="tms-profile-card">
-              <p className="tms-body-text">{t("Все ваши заявки и отзывы будут удалены безвозвратно. Продолжить?")}</p>
+              <p className="tms-body-text">{t("Профиль будет скрыт и станет неактивным — вы выйдете из личного кабинета, а заявки пропадут из ленты мастеров. Заявки, отзывы и рейтинг не удаляются и вернутся, если вы снова выберете «Я клиент». Продолжить?")}</p>
               <div className="tms-offer-actions">
                 <button className="tms-decline-btn" onClick={confirmDeleteClientAccount}>{t("Да, удалить")}</button>
                 <button className="tms-select-btn" onClick={() => setClientShowDeleteConfirm(false)}>{t("Отмена")}</button>
@@ -2338,7 +2358,7 @@ export default function TbilisiMiniApp() {
             <button className="tms-decline-btn" onClick={() => setShowDeleteConfirm(true)}>{t("Удалить аккаунт")}</button>
           ) : (
             <div className="tms-profile-card">
-              <p className="tms-body-text">{t("Все данные анкеты, заявки и отзывы будут удалены безвозвратно. Продолжить?")}</p>
+              <p className="tms-body-text">{t("Профиль будет скрыт и станет неактивным — вы пропадёте из ленты клиентов и подбора мастеров. Анкета, отклики, рейтинг и отзывы не удаляются и вернутся, если вы снова выберете «Я мастер». Продолжить?")}</p>
               <div className="tms-offer-actions">
                 <button className="tms-decline-btn" onClick={confirmDeleteAccount}>{t("Да, удалить")}</button>
                 <button className="tms-select-btn" onClick={() => setShowDeleteConfirm(false)}>{t("Отмена")}</button>
