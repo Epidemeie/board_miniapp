@@ -53,6 +53,9 @@ const RU_TO_EN = {
   "Языки": "Languages",
   "Поддержка": "Support",
   "Написать в поддержку →": "Contact support →",
+  "Режим": "Mode",
+  "Перейти в кабинет мастера →": "Switch to provider account →",
+  "Перейти в кабинет клиента →": "Switch to client account →",
   "Опасная зона": "Danger zone",
   "Удалить аккаунт": "Delete account",
   "Да, удалить": "Yes, delete",
@@ -165,6 +168,14 @@ const RU_TO_EN = {
   "Заявки взяты в работу": "Requests taken into work",
   "Чат с мастерами": "Chat with pros",
   "Все ваши заявки и отзывы будут удалены безвозвратно. Продолжить?": "All your requests and reviews will be permanently deleted. Continue?",
+  // Рейтинг клиента (симметрично рейтингу мастера)
+  "Мой рейтинг": "My rating",
+  "Отзывы обо мне от мастеров →": "Reviews about me from pros →",
+  "Отзыв о клиенте": "Review of the client",
+  "Оставить отзыв о клиенте": "Leave a review of the client",
+  "Оцените клиента": "Rate the client",
+  "Какой был опыт работы с этим клиентом": "What was it like working with this client",
+  "Оставить отзыв": "Leave a review",
   // Регистрация мастера
   "Какие услуги оказываете": "Which services do you provide",
   "Можно выбрать несколько": "You can select several",
@@ -611,17 +622,48 @@ function ChatInputBar({ value, onChange, onSend, t = (s) => s }) {
 export default function TbilisiMiniApp() {
   const tgUser = useMemo(getTelegramUser, []);
 
-  // Язык выбирается на отдельном экране при каждом открытии приложения
-  // (см. renderLanguage); последний выбор запоминается только для того,
-  // чтобы подсветить его при следующем открытии, а не чтобы пропустить экран.
+  // Экраны language/role показываются только при первом открытии — дальше
+  // выбор хранится на backend по telegramId (см. useEffect ниже) и в
+  // localStorage как быстрый локальный кэш на случай недоступности backend.
   const [language, setLanguage] = useState(() => localStorage.getItem("app_language") || "ru");
   const t = (s) => (language === "en" ? RU_TO_EN[s] ?? s : s);
   const locale = language === "en" ? "en-GB" : "ru-RU";
 
   const [history, setHistory] = useState([]);
-  const [screen, setScreen] = useState("language");
+  // "boot" — пустой экран на время проверки сохранённых предпочтений на
+  // backend, чтобы не мигнуть экранами language/role тем, кто их уже проходил.
+  const [screen, setScreen] = useState("boot");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  function persistPrefs(partial) {
+    api("/users/prefs", {
+      method: "PUT",
+      body: JSON.stringify({ telegramId: tgUser.id, name: tgUser.name, username: tgUser.username, ...partial }),
+    }).catch(() => {});
+  }
+
+  useEffect(() => {
+    const cached = localStorage.getItem("app_language");
+    api(`/users/prefs/${tgUser.id}`)
+      .then(async (res) => {
+        const lang = res.language || cached;
+        if (!lang) {
+          setScreen("language");
+          return;
+        }
+        setLanguage(lang);
+        localStorage.setItem("app_language", lang);
+        // Роль (клиент/мастер) уже выбирали раньше — сразу входим в её
+        // кабинет вместо экрана role; chooseClient/chooseProvider сами
+        // подгружают данные и переходят на нужный экран.
+        if (res.entryRole === "client") await chooseClient();
+        else if (res.entryRole === "provider") await chooseProvider();
+        else setScreen("role");
+      })
+      .catch(() => setScreen(cached ? "role" : "language"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ---- Клиент: создание заявки (существующий рабочий поток) ----
   const [categories, setCategories] = useState([]);
@@ -632,6 +674,9 @@ export default function TbilisiMiniApp() {
 
   // ---- Клиент: личный кабинет (заявки/предложения/заказы — реальные данные с backend) ----
   const [myRequests, setMyRequests] = useState([]);
+  // Публичный профиль клиента (рейтинг + отзывы от мастеров) — симметрично
+  // provider-состоянию у мастера, см. chooseClient()/getClientReviewStats().
+  const [clientProfile, setClientProfile] = useState(null);
   const [selectedRequestId, setSelectedRequestId] = useState(null);
   const [viewedProvider, setViewedProvider] = useState(null);
   const [selectedClientOrderId, setSelectedClientOrderId] = useState(null);
@@ -661,6 +706,7 @@ export default function TbilisiMiniApp() {
   const [selectedOffer, setSelectedOffer] = useState(null);
   const [offerTargetRequest, setOfferTargetRequest] = useState(null);
   const [offerForm, setOfferForm] = useState({ price: "", comment: "" });
+  const [clientReviewForm, setClientReviewForm] = useState({ rating: 5, text: "" });
   const [profileExtra, setProfileExtra] = useState({
     languages: ["Русский"],
     phone: "",
@@ -712,9 +758,19 @@ export default function TbilisiMiniApp() {
   function chooseLanguage(lang) {
     setLanguage(lang);
     localStorage.setItem("app_language", lang);
+    persistPrefs({ language: lang });
     setHistory([]);
     setError(null);
     setScreen("role");
+  }
+
+  // Ненавязчивый переключатель на экране выбора роли — для тех, кто выбрал
+  // язык один раз и передумал, без возврата на экран language.
+  function toggleLanguage() {
+    const next = language === "ru" ? "en" : "ru";
+    setLanguage(next);
+    localStorage.setItem("app_language", next);
+    persistPrefs({ language: next });
   }
 
   async function withLoading(fn) {
@@ -736,9 +792,27 @@ export default function TbilisiMiniApp() {
     setMyRequests(await api(`/requests/mine?telegramId=${tgUser.id}`));
   }
 
+  // Профиль клиента (рейтинг + отзывы от мастеров) — симметрично тому, как
+  // chooseProvider() подгружает GET /providers/by-telegram → GET /providers/:id.
+  async function loadClientProfile() {
+    const existing = await api(`/users/by-telegram/${tgUser.id}`);
+    setClientProfile(existing ? await api(`/users/${existing.id}`) : null);
+  }
+
   async function chooseClient() {
-    await withLoading(loadMyRequests);
+    await withLoading(async () => {
+      await Promise.all([loadMyRequests(), loadClientProfile()]);
+    });
     goTab("client-dashboard");
+  }
+
+  // Явный выбор роли — на экране role или переключателем в настройках.
+  // В отличие от chooseClient/chooseProvider (которые просто открывают
+  // кабинет — используются и при автовходе по сохранённому entryRole),
+  // здесь ещё и запоминаем выбор как предпочтение входа на будущее.
+  function pickClient() {
+    persistPrefs({ entryRole: "client" });
+    return chooseClient();
   }
 
   function openCreateRequest() {
@@ -889,6 +963,11 @@ export default function TbilisiMiniApp() {
     });
   }
 
+  function pickProvider() {
+    persistPrefs({ entryRole: "provider" });
+    return chooseProvider();
+  }
+
   function toggleProviderArea(area) {
     setProviderForm((f) => ({
       ...f,
@@ -969,6 +1048,16 @@ export default function TbilisiMiniApp() {
     return [5, 4, 3, 2, 1].map((stars) => ({ stars, count: counts[stars] }));
   }
 
+  // Отзывы, которые мастера оставили клиенту — зеркало getReviewStats/getReviewDistribution.
+  function getClientReviewStats() {
+    return { avg: clientProfile?.rating ?? 0, total: clientProfile?.reviewCount ?? (clientProfile?.clientReviews || []).length };
+  }
+  function getClientReviewDistribution() {
+    const counts = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+    for (const r of clientProfile?.clientReviews || []) counts[r.rating] = (counts[r.rating] || 0) + 1;
+    return [5, 4, 3, 2, 1].map((stars) => ({ stars, count: counts[stars] }));
+  }
+
   function getMonthIncome() {
     const now = new Date();
     return getCompletedOffers()
@@ -1032,6 +1121,33 @@ export default function TbilisiMiniApp() {
     navigate("provider-order-detail");
   }
 
+  // Отзыв мастера о клиенте — зеркало startReview/submitReview у клиента,
+  // доступно после того, как заказ уже завершён (см. renderProviderOrderDetail).
+  // selectedOffer уже установлен (мы на экране деталей заказа), просто открываем форму.
+  function startClientReview() {
+    setClientReviewForm({ rating: 5, text: "" });
+    navigate("provider-client-review");
+  }
+
+  async function submitClientReview() {
+    const o = selectedOffer;
+    if (!o) return;
+    await withLoading(async () => {
+      await api("/client-reviews", {
+        method: "POST",
+        body: JSON.stringify({
+          providerId: provider.id,
+          requestId: o.requestId,
+          userId: o.request.user.id,
+          rating: clientReviewForm.rating,
+          text: clientReviewForm.text || undefined,
+        }),
+      });
+      await loadProviderInbox(provider);
+      goTab("provider-orders");
+    });
+  }
+
   function sendSupportMessage() {
     if (!supportDraft.trim()) return;
     setSupportMessages((m) => [...m, { from: "me", text: supportDraft.trim(), time: "сейчас" }]);
@@ -1070,16 +1186,19 @@ export default function TbilisiMiniApp() {
     return (
       <div className="tms-screen">
         <div className="tms-hero">
-          <p className="tms-greeting">{tgUser.name}{t(", привет")}</p>
+          <div className="tms-lang-row">
+            <p className="tms-greeting">{tgUser.name}{t(", привет")}</p>
+            <button className="tms-lang-pill" onClick={toggleLanguage}>{language === "ru" ? "EN" : "RU"}</button>
+          </div>
           <h1 className="tms-hero-title">{t("Вы клиент или мастер?")}</h1>
         </div>
         <div className="tms-role-grid">
-          <button className="tms-role-card" onClick={chooseClient}>
+          <button className="tms-role-card" onClick={pickClient}>
             <span className="tms-role-emoji">🔍</span>
             <span className="tms-role-title">{t("Я клиент")}</span>
             <span className="tms-role-sub">{t("Ищу мастера для задачи")}</span>
           </button>
-          <button className="tms-role-card" onClick={chooseProvider}>
+          <button className="tms-role-card" onClick={pickProvider}>
             <span className="tms-role-emoji">🛠️</span>
             <span className="tms-role-title">{t("Я мастер")}</span>
             <span className="tms-role-sub">{t("Хочу получать заявки")}</span>
@@ -1238,6 +1357,7 @@ export default function TbilisiMiniApp() {
   function renderClientDashboard() {
     const activeRequests = myRequests.filter((r) => r.status === "open" && !r.archived);
     const inWorkRequests = myRequests.filter((r) => r.status === "matched");
+    const { avg: clientRatingAvg } = getClientReviewStats();
     return (
       <div className="tms-screen">
         <div className="tms-hero">
@@ -1249,6 +1369,8 @@ export default function TbilisiMiniApp() {
             onClick={activeRequests.length ? () => openRequestDetail(activeRequests[0]) : undefined} />
           <StatCard icon="🟢" label={t("Заказы в работе")} value={inWorkRequests.length}
             onClick={() => goTab("client-my-orders")} />
+          <StatCard icon="⭐" label={t("Мой рейтинг")} value={clientRatingAvg.toFixed(1)}
+            onClick={() => navigate("client-reviews")} />
         </div>
         <div className="tms-section">
           <button className="tms-mainbutton" onClick={openCreateRequest}>{t("+ Создать заявку")}</button>
@@ -1538,8 +1660,18 @@ export default function TbilisiMiniApp() {
         </div>
 
         <div className="tms-section">
+          <p className="tms-section-label">{t("Мой рейтинг")}</p>
+          <button className="tms-link-row" onClick={() => navigate("client-reviews")}>{t("Отзывы обо мне от мастеров →")}</button>
+        </div>
+
+        <div className="tms-section">
           <p className="tms-section-label">{t("Поддержка")}</p>
           <button className="tms-link-row" onClick={() => navigate("client-support")}>{t("Написать в поддержку →")}</button>
+        </div>
+
+        <div className="tms-section">
+          <p className="tms-section-label">{t("Режим")}</p>
+          <button className="tms-link-row" onClick={pickProvider}>{t("Перейти в кабинет мастера →")}</button>
         </div>
 
         <div className="tms-section">
@@ -1700,6 +1832,7 @@ export default function TbilisiMiniApp() {
                 <span className="tms-provider-meta">{t(r.area) || t("район не указан")}{r.urgency ? ` · ${t(r.urgency)}` : ""}</span>
                 {r.description && <span className="tms-provider-meta">{r.description}</span>}
                 {typeof r.budget === "number" && <span className="tms-provider-meta">{language === "en" ? "up to" : "до"} {r.budget} ₾</span>}
+                <span className="tms-provider-meta">{t("Клиент")}: {r.user.name} · ★ {(r.user.rating ?? 0).toFixed(1)} ({r.user.reviewCount ?? 0})</span>
               </div>
               <div className="tms-offer-actions" style={{ marginTop: 0 }}>
                 <button className="tms-select-btn" onClick={() => startOffer(r)}>{t("Взять в работу")}</button>
@@ -1807,6 +1940,7 @@ export default function TbilisiMiniApp() {
             <span className="tms-provider-info">
               <span className="tms-provider-name">{o.request.user.name}</span>
               <span className="tms-provider-meta">{o.request.user.username ? `@${o.request.user.username}` : t("username не указан")}</span>
+              <span className="tms-provider-meta">★ {(o.request.user.rating ?? 0).toFixed(1)} · {o.request.user.reviewCount ?? 0} {t("отз.")}</span>
             </span>
           </div>
         </div>
@@ -1818,6 +1952,19 @@ export default function TbilisiMiniApp() {
           <p className="tms-section-label">{t("Сумма работы")}</p>
           <p className="tms-body-text">{o.price} ₾</p>
         </div>
+        {o.request.status === "completed" && (
+          <div className="tms-section">
+            <p className="tms-section-label">{t("Отзыв о клиенте")}</p>
+            {o.request.clientReviews?.length ? (
+              <div className="tms-profile-card">
+                <p className="tms-review-stars">{"★".repeat(o.request.clientReviews[0].rating)}{"☆".repeat(5 - o.request.clientReviews[0].rating)}</p>
+                {o.request.clientReviews[0].text && <p className="tms-body-text">«{o.request.clientReviews[0].text}»</p>}
+              </div>
+            ) : (
+              <button className="tms-select-btn" style={{ width: "100%", padding: "12px" }} onClick={startClientReview}>{t("Оставить отзыв о клиенте")}</button>
+            )}
+          </div>
+        )}
         <div className="tms-section">
           {telegramLink ? (
             <a className="tms-select-btn" style={{ display: "block", width: "100%", padding: "12px", textAlign: "center", textDecoration: "none" }} href={telegramLink} target="_blank" rel="noreferrer">
@@ -1827,6 +1974,29 @@ export default function TbilisiMiniApp() {
             <p className="muted">{t("Клиент не указал username в Telegram — свяжитесь через заявку.")}</p>
           )}
         </div>
+      </div>
+    );
+  }
+
+  // Зеркало renderClientReview — мастер оценивает клиента.
+  function renderProviderClientReview() {
+    const o = selectedOffer;
+    if (!o) return null;
+    return (
+      <div className="tms-screen">
+        <div className="tms-section" style={{ marginTop: 4 }}>
+          <p className="tms-section-label">{t("Оцените клиента")}</p>
+          <p className="muted">{o.request.user.name} · {t(o.request.service.name)}</p>
+        </div>
+        <div className="tms-section">
+          <StarPicker value={clientReviewForm.rating} onChange={(rating) => setClientReviewForm((f) => ({ ...f, rating }))} t={t} />
+        </div>
+        <div className="tms-section">
+          <p className="tms-section-label">{t("Комментарий (необязательно)")}</p>
+          <textarea className="tms-textarea" rows={3} placeholder={t("Какой был опыт работы с этим клиентом")}
+            value={clientReviewForm.text} onChange={(e) => setClientReviewForm((f) => ({ ...f, text: e.target.value }))} />
+        </div>
+        {error && <p className="tms-error">{error}</p>}
       </div>
     );
   }
@@ -2032,6 +2202,56 @@ export default function TbilisiMiniApp() {
     );
   }
 
+  // Зеркало renderProviderReviews — отзывы, которые мастера оставили клиенту.
+  function renderClientReviews(all) {
+    const { avg: rating, total } = getClientReviewStats();
+    const distribution = getClientReviewDistribution();
+    const maxCount = Math.max(1, ...distribution.map((d) => d.count));
+    const reviews = clientProfile?.clientReviews || [];
+    const list = (all ? reviews : reviews.slice(0, 3)).map((r) => ({
+      name: r.provider?.user?.name || t("Мастер"),
+      text: r.text,
+      rating: r.rating,
+      date: new Date(r.createdAt).toLocaleDateString(locale),
+    }));
+    return (
+      <div className="tms-screen">
+        {!all && (
+          <div className="tms-section" style={{ marginTop: 4 }}>
+            <div className="tms-review-summary">
+              <div className="tms-review-score">
+                <span className="tms-review-score-value">{rating.toFixed(1)}</span>
+                <span className="tms-review-stars">{"★".repeat(Math.round(rating))}{"☆".repeat(5 - Math.round(rating))}</span>
+                <span className="tms-provider-meta">{total} {t("отзывов")}</span>
+              </div>
+              <div className="tms-review-bars">
+                {distribution.map((d) => (
+                  <div className="tms-review-bar-row" key={d.stars}>
+                    <span className="tms-provider-meta">{d.stars} ★</span>
+                    <span className="tms-legend-bar-track"><span className="tms-legend-bar-fill" style={{ width: `${(d.count / maxCount) * 100}%` }} /></span>
+                    <span className="tms-provider-meta">{d.count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+        <div className="tms-section">
+          {!all && <p className="tms-section-label">{t("Последние отзывы")}</p>}
+          <div className="tms-list-plain">
+            {list.map((r, i) => <ReviewRow key={i} review={r} />)}
+          </div>
+          {list.length === 0 && <p className="muted">{t("Отзывов пока нет.")}</p>}
+          {!all && reviews.length > 3 && (
+            <button className="tms-link-row" style={{ marginTop: 12 }} onClick={() => navigate("client-reviews-all")}>
+              {t("Показать все отзывы →")}
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   function renderProviderFinance() {
     const balance = getAllTimeIncome();
     const history = getCompletedOffers()
@@ -2108,6 +2328,11 @@ export default function TbilisiMiniApp() {
         </div>
 
         <div className="tms-section">
+          <p className="tms-section-label">{t("Режим")}</p>
+          <button className="tms-link-row" onClick={pickClient}>{t("Перейти в кабинет клиента →")}</button>
+        </div>
+
+        <div className="tms-section">
           <p className="tms-section-label">{t("Опасная зона")}</p>
           {!showDeleteConfirm ? (
             <button className="tms-decline-btn" onClick={() => setShowDeleteConfirm(true)}>{t("Удалить аккаунт")}</button>
@@ -2152,6 +2377,8 @@ export default function TbilisiMiniApp() {
       case "client-my-orders": return renderClientMyOrders();
       case "client-order-detail": return renderClientOrderDetail();
       case "client-review": return renderClientReview();
+      case "client-reviews": return renderClientReviews(false);
+      case "client-reviews-all": return renderClientReviews(true);
       case "client-profile": return renderClientProfile();
       case "client-support": return renderSupportChat();
       case "provider-register": return renderProviderRegister();
@@ -2159,6 +2386,7 @@ export default function TbilisiMiniApp() {
       case "provider-requests": return renderProviderRequests();
       case "provider-orders": return renderProviderOrders();
       case "provider-order-detail": return renderProviderOrderDetail();
+      case "provider-client-review": return renderProviderClientReview();
       case "provider-messages": return renderProviderMessages();
       case "provider-offer": return renderProviderOffer();
       case "provider-profile-cabinet": return renderProviderProfileCabinet();
@@ -2189,6 +2417,8 @@ export default function TbilisiMiniApp() {
     "client-my-orders": t("Мои заказы"),
     "client-order-detail": t("Заказ"),
     "client-review": t("Отзыв о мастере"),
+    "client-reviews": t("Мой рейтинг"),
+    "client-reviews-all": t("Все отзывы"),
     "client-profile": t("Профиль"),
     "client-support": t("Поддержка"),
     "provider-register": t("Регистрация мастера"),
@@ -2196,6 +2426,7 @@ export default function TbilisiMiniApp() {
     "provider-requests": t("Заявки"),
     "provider-orders": t("Заказы"),
     "provider-order-detail": t("Заказ"),
+    "provider-client-review": t("Отзыв о клиенте"),
     "provider-messages": t("Сообщения"),
     "provider-offer": t("Ваш отклик"),
     "provider-profile-cabinet": t("Профиль"),
@@ -2219,6 +2450,8 @@ export default function TbilisiMiniApp() {
         return { label: loading ? t("Сохраняю…") : t("Оставить отзыв и завершить"), disabled: loading, onClick: submitReview };
       case "provider-offer":
         return { label: loading ? t("Отправляю…") : t("Отправить отклик"), disabled: loading || !offerForm.price, onClick: submitOffer };
+      case "provider-client-review":
+        return { label: loading ? t("Сохраняю…") : t("Оставить отзыв"), disabled: loading, onClick: submitClientReview };
       case "provider-register": {
         let hint;
         if (providerForm.serviceIds.length === 0) hint = t("Выберите хотя бы одну услугу");
@@ -2289,6 +2522,8 @@ export default function TbilisiMiniApp() {
         .tms-screen { padding: 20px 20px 32px; display: flex; flex-direction: column; gap: 2px; }
         .tms-hero { padding: 4px 0 8px; }
         .tms-greeting { font-size: 13px; color: var(--muted); margin: 0 0 4px; }
+        .tms-lang-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+        .tms-lang-pill { border: 1px solid var(--line); background: var(--card); color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: 0.04em; border-radius: 20px; padding: 4px 10px; cursor: pointer; flex-shrink: 0; }
         .tms-hero-title { font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 600; margin: 0; line-height: 1.2; }
         .tms-role-grid { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
         .tms-role-card { text-align: left; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px; cursor: pointer; display: flex; flex-direction: column; gap: 4px; }
