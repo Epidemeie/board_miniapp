@@ -100,11 +100,13 @@ const RU_TO_EN = {
   "Предложения": "Offers",
   // Роль
   ", привет": ", hi",
-  "Вы клиент или мастер?": "Are you a client or a pro?",
+  "Мастера рядом, работа под рукой": "Pros nearby, work at hand",
+  "Заказывайте услуги у проверенных мастеров или принимайте заказы — прямо в Telegram.":
+    "Order services from verified pros, or take on orders yourself — right inside Telegram.",
   "Я клиент": "I'm a client",
   "Ищу мастера для задачи": "Looking for a pro for a task",
   "Я мастер": "I'm a pro",
-  "Хочу получать заявки": "Want to receive requests",
+  "Принимать заказы и зарабатывать": "Take orders and earn",
   // Клиент: создание заявки
   "Категории": "Categories",
   "Категорий пока нет — загляните позже.": "No categories yet — check back later.",
@@ -258,7 +260,7 @@ const RU_TO_EN = {
   "Опишите проблему или предложение — сообщение придёт в поддержку.": "Describe a problem or a suggestion — the message will reach support.",
   // Заголовки экранов
   "Заказ": "Order",
-  "Мастера · Тбилиси": "Pros · Tbilisi",
+  "Услуги · Тбилиси": "Services · Tbilisi",
   "Выбор услуги": "Choose service",
   "Новая заявка": "New request",
   "Подходящие мастера": "Matching pros",
@@ -1209,7 +1211,10 @@ export default function TbilisiMiniApp() {
             <p className="tms-greeting">{tgUser.name}{t(", привет")}</p>
             <button className="tms-lang-pill" onClick={toggleLanguage}>{language === "ru" ? "EN" : "RU"}</button>
           </div>
-          <h1 className="tms-hero-title">{t("Вы клиент или мастер?")}</h1>
+          <div className="tms-role-intro">
+            <h1 className="tms-hero-title">{t("Мастера рядом, работа под рукой")}</h1>
+            <p className="tms-hero-subtitle">{t("Заказывайте услуги у проверенных мастеров или принимайте заказы — прямо в Telegram.")}</p>
+          </div>
         </div>
         <div className="tms-role-grid">
           <button className="tms-role-card" onClick={pickClient}>
@@ -1220,7 +1225,7 @@ export default function TbilisiMiniApp() {
           <button className="tms-role-card" onClick={pickProvider}>
             <span className="tms-role-emoji">🛠️</span>
             <span className="tms-role-title">{t("Я мастер")}</span>
-            <span className="tms-role-sub">{t("Хочу получать заявки")}</span>
+            <span className="tms-role-sub">{t("Принимать заказы и зарабатывать")}</span>
           </button>
         </div>
         {error && <p className="tms-error">{error}</p>}
@@ -2423,7 +2428,7 @@ export default function TbilisiMiniApp() {
 
   const TITLES = {
     language: t("Выберите язык"),
-    role: t("Мастера · Тбилиси"),
+    role: t("Услуги · Тбилиси"),
     "client-home": t("Категории"),
     "client-services": t("Выбор услуги"),
     "client-request": t("Новая заявка"),
@@ -2544,6 +2549,8 @@ export default function TbilisiMiniApp() {
         .tms-lang-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
         .tms-lang-pill { border: 1px solid var(--line); background: var(--card); color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: 0.04em; border-radius: 20px; padding: 4px 10px; cursor: pointer; flex-shrink: 0; }
         .tms-hero-title { font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 600; margin: 0; line-height: 1.2; }
+        .tms-hero-subtitle { font-size: 14px; line-height: 1.5; color: var(--muted); margin: 8px 0 0; }
+        .tms-role-intro { text-align: center; padding: 8px 4px 0; }
         .tms-role-grid { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
         .tms-role-card { text-align: left; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px; cursor: pointer; display: flex; flex-direction: column; gap: 4px; }
         .tms-role-emoji { font-size: 22px; }
