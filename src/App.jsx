@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 const API_BASE = import.meta.env.DEV ? "http://localhost:3000/api" : "https://api.goservices.lol/api";
 
@@ -165,7 +165,6 @@ const RU_TO_EN = {
   "Что понравилось или что можно улучшить": "What you liked or what could be better",
   // Профиль клиента
   "Заявки взяты в работу": "Requests taken into work",
-  "Чат с мастерами": "Chat with pros",
   "Профиль будет скрыт и станет неактивным — вы выйдете из личного кабинета, а заявки пропадут из ленты мастеров. Заявки, отзывы и рейтинг не удаляются и вернутся, если вы снова выберете «Я клиент». Продолжить?":
     "Your profile will be hidden and deactivated — you'll be logged out of your account, and your requests will disappear from pros' feed. Requests, reviews and rating aren't deleted and will come back if you pick \"I'm a client\" again. Continue?",
   // Рейтинг клиента (симметрично рейтингу мастера)
@@ -192,6 +191,13 @@ const RU_TO_EN = {
   "Новых заявок": "New requests",
   "Рейтинг": "Rating",
   "Чаты с клиентами": "Chats with clients",
+  "Чаты по активным заказам": "Chats for active orders",
+  "Чат": "Chat",
+  "Чаты": "Chats",
+  "Сообщений пока нет — напишите первым.": "No messages yet — say hi first.",
+  "Сообщение…": "Message…",
+  "💬 Чат с мастером": "💬 Chat with the pro",
+  "💬 Чат с клиентом": "💬 Chat with the client",
   "Доход за месяц": "Income this month",
   "Конверсия": "Conversion",
   "заявок": "requests",
@@ -215,7 +221,6 @@ const RU_TO_EN = {
   "Сумма работы": "Job amount",
   "💬 Написать в Telegram": "💬 Message on Telegram",
   "Клиент не указал username в Telegram — свяжитесь через заявку.": "The client hasn't set a Telegram username — get in touch via the request.",
-  "Клиенты по активным заказам": "Clients from active orders",
   "Основная информация": "Basic information",
   "Категория не выбрана": "No category selected",
   "Расскажите об опыте и специализации": "Tell us about your experience and specialization",
@@ -253,8 +258,7 @@ const RU_TO_EN = {
   "Новые отзывы": "New reviews",
   "Новые отзывы обо мне": "New reviews about me",
   "Действия по заказам": "Order actions",
-  "Чат с мастерами — донастроим отдельно, остальные уведомления уже приходят от Telegram-бота.": "Chat with pros — coming separately, other notifications already arrive via the Telegram bot.",
-  "Чат с клиентами — донастроим отдельно, остальные уведомления уже приходят от Telegram-бота.": "Chat with clients — coming separately, other notifications already arrive via the Telegram bot.",
+  "Новые сообщения в чате": "New chat messages",
   "Профиль будет скрыт и станет неактивным — вы пропадёте из ленты клиентов и подбора мастеров. Анкета, отклики, рейтинг и отзывы не удаляются и вернутся, если вы снова выберете «Я мастер». Продолжить?":
     "Your profile will be hidden and deactivated — you'll disappear from clients' feed and matching. Your profile, offers, rating and reviews aren't deleted and will come back if you pick \"I'm a pro\" again. Continue?",
   "Опишите проблему или предложение — обращение придёт в поддержку.": "Describe a problem or a suggestion — it'll reach support.",
@@ -547,11 +551,14 @@ function TabBar({ items, active, onNavigate }) {
   );
 }
 
-function StatCard({ icon, label, value, onClick, tone }) {
+function StatCard({ icon, label, value, onClick, tone, badge }) {
   const Tag = onClick ? "button" : "div";
   return (
     <Tag className={`tms-stat-card ${onClick ? "is-clickable" : ""} ${tone ? `tms-stat-${tone}` : ""}`} onClick={onClick}>
-      <span className="tms-stat-icon">{icon}</span>
+      <span style={{ position: "relative" }}>
+        <span className="tms-stat-icon">{icon}</span>
+        {badge > 0 && <span className="tms-unread-dot tms-unread-dot-corner">{badge}</span>}
+      </span>
       <span className="tms-stat-body">
         <span className="tms-stat-value">{value}</span>
         <span className="tms-stat-label">{label}</span>
@@ -675,6 +682,7 @@ export default function TbilisiMiniApp() {
           ...f,
           notifyOrders: res.notifyOrders ?? true,
           notifyReviews: res.notifyReviews ?? true,
+          notifyChat: res.notifyChat ?? true,
         }));
         // Роль (клиент/мастер) уже выбирали раньше — сразу входим в её
         // кабинет вместо экрана role; chooseClient/chooseProvider сами
@@ -753,6 +761,15 @@ export default function TbilisiMiniApp() {
   const [supportForm, setSupportForm] = useState({ subject: "", text: "" });
   const [supportTicket, setSupportTicket] = useState(null);
 
+  // ---- Чат по заказу (клиент ↔ мастер, доступен после подтверждения) ----
+  const [chatRequestId, setChatRequestId] = useState(null);
+  const [chatData, setChatData] = useState(null); // { role, messages, otherName, serviceName }
+  const [chatText, setChatText] = useState("");
+  const [chatSending, setChatSending] = useState(false);
+  const [clientUnread, setClientUnread] = useState({ total: 0, byRequestId: {} });
+  const [providerUnread, setProviderUnread] = useState({ total: 0, byRequestId: {} });
+  const chatScrollRef = useRef(null);
+
   function navigate(next) {
     setError(null);
     setHistory((h) => [...h, screen]);
@@ -813,6 +830,7 @@ export default function TbilisiMiniApp() {
 
   async function loadMyRequests() {
     setMyRequests(await api(`/requests/mine?telegramId=${tgUser.id}`));
+    api(`/messages/unread-count?telegramId=${tgUser.id}&role=client`).then(setClientUnread).catch(() => {});
   }
 
   // Профиль клиента (рейтинг + отзывы от мастеров) — симметрично тому, как
@@ -973,7 +991,69 @@ export default function TbilisiMiniApp() {
     ]);
     setOpenRequests(open);
     setMyOffers(offers);
+    api(`/messages/unread-count?telegramId=${tgUser.id}&role=provider`).then(setProviderUnread).catch(() => {});
   }
+
+  // ---- Чат по заказу ----
+
+  async function loadChatThread(requestId) {
+    const data = await api(`/messages/thread/${requestId}?telegramId=${tgUser.id}`);
+    setChatData(data);
+    if (data.role === "client") {
+      setClientUnread((u) => ({ total: 0, byRequestId: { ...u.byRequestId, [requestId]: 0 } }));
+    } else {
+      setProviderUnread((u) => ({ total: 0, byRequestId: { ...u.byRequestId, [requestId]: 0 } }));
+    }
+  }
+
+  function openClientChat(request) {
+    setChatData(null);
+    setChatText("");
+    setChatRequestId(request.id);
+    navigate("client-chat");
+    loadChatThread(request.id).catch((e) => setError(e.message));
+  }
+
+  function openProviderChat(offer) {
+    setChatData(null);
+    setChatText("");
+    setChatRequestId(offer.requestId ?? offer.request.id);
+    navigate("provider-chat");
+    loadChatThread(offer.requestId ?? offer.request.id).catch((e) => setError(e.message));
+  }
+
+  async function sendChatMessage() {
+    const text = chatText.trim();
+    if (!text || !chatRequestId) return;
+    setChatSending(true);
+    try {
+      await api(`/messages/thread/${chatRequestId}`, {
+        method: "POST",
+        body: JSON.stringify({ telegramId: tgUser.id, text }),
+      });
+      setChatText("");
+      await loadChatThread(chatRequestId);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setChatSending(false);
+    }
+  }
+
+  // Поллинг открытого треда — простой setInterval, без websocket (см. CLAUDE-frontend.md).
+  useEffect(() => {
+    if (screen !== "client-chat" && screen !== "provider-chat") return;
+    if (!chatRequestId) return;
+    const id = setInterval(() => {
+      loadChatThread(chatRequestId).catch(() => {});
+    }, 4000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen, chatRequestId]);
+
+  useEffect(() => {
+    if (chatScrollRef.current) chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+  }, [chatData?.messages.length]);
 
   async function chooseProvider() {
     await withLoading(async () => {
@@ -992,6 +1072,7 @@ export default function TbilisiMiniApp() {
           notifyRequests: full.notifyRequests ?? true,
           notifyReviews: full.notifyReviews ?? true,
           notifyOrders: full.notifyOrders ?? true,
+          notifyChat: full.notifyChat ?? true,
         }));
         await ensureAllServices();
         await loadProviderInbox(full);
@@ -1428,7 +1509,7 @@ export default function TbilisiMiniApp() {
         <div className="tms-stat-grid">
           <StatCard icon="📨" label={t("Активная заявка")} value={activeRequests.length}
             onClick={activeRequests.length ? () => openRequestDetail(activeRequests[0]) : undefined} />
-          <StatCard icon="🟢" label={t("Заказы в работе")} value={inWorkRequests.length}
+          <StatCard icon="🟢" label={t("Заказы в работе")} value={inWorkRequests.length} badge={clientUnread.total}
             onClick={() => goTab("client-my-orders")} />
           <StatCard icon="⭐" label={t("Мой рейтинг")} value={clientRatingAvg.toFixed(1)}
             onClick={() => navigate("client-reviews")} />
@@ -1567,6 +1648,7 @@ export default function TbilisiMiniApp() {
 
   function renderClientOrderRow(r) {
     const offer = r.offers.find((o) => o.status === "accepted");
+    const unread = clientUnread.byRequestId[r.id] || 0;
     return (
       <button key={r.id} className="tms-order-card" onClick={() => openClientOrder(r)}>
         <div className="tms-provider-info" style={{ flex: 1 }}>
@@ -1574,6 +1656,7 @@ export default function TbilisiMiniApp() {
           <span className="tms-provider-meta">{t(r.service.name)}{r.status === "completed" ? ` ${t("· Завершён")}` : ""}</span>
         </div>
         <span className="tms-offer-terms">{offer?.price ?? r.budget} ₾</span>
+        {unread > 0 && <span className="tms-unread-dot">{unread}</span>}
         <span className="tms-chevron">→</span>
       </button>
     );
@@ -1639,6 +1722,13 @@ export default function TbilisiMiniApp() {
           <p className="tms-section-label">{t("Создано")}</p>
           <p className="tms-body-text">{new Date(r.createdAt).toLocaleDateString(locale)}</p>
         </div>
+        {offer && (
+          <div className="tms-section">
+            <button className="tms-select-btn" style={{ width: "100%", padding: "12px" }} onClick={() => openClientChat(r)}>
+              {t("💬 Чат с мастером")}{clientUnread.byRequestId[r.id] > 0 ? ` (${clientUnread.byRequestId[r.id]})` : ""}
+            </button>
+          </div>
+        )}
         {isCompleted ? (
           <>
             {review && (
@@ -1717,9 +1807,8 @@ export default function TbilisiMiniApp() {
           <div className="tms-profile-card">
             <Toggle checked={clientSettingsForm.notifyOrders} onChange={(v) => { setClientSettingsForm((f) => ({ ...f, notifyOrders: v })); persistPrefs({ notifyOrders: v }); }} label={t("Заявки взяты в работу")} />
             <Toggle checked={clientSettingsForm.notifyReviews} onChange={(v) => { setClientSettingsForm((f) => ({ ...f, notifyReviews: v })); persistPrefs({ notifyReviews: v }); }} label={t("Новые отзывы обо мне")} />
-            <Toggle checked={clientSettingsForm.notifyChat} onChange={(v) => setClientSettingsForm((f) => ({ ...f, notifyChat: v }))} label={t("Чат с мастерами")} />
+            <Toggle checked={clientSettingsForm.notifyChat} onChange={(v) => { setClientSettingsForm((f) => ({ ...f, notifyChat: v })); persistPrefs({ notifyChat: v }); }} label={t("Новые сообщения в чате")} />
           </div>
-          <p className="muted">{t("Чат с мастерами — донастроим отдельно, остальные уведомления уже приходят от Telegram-бота.")}</p>
         </div>
 
         <div className="tms-section">
@@ -1845,7 +1934,7 @@ export default function TbilisiMiniApp() {
             onClick={() => { setOrdersTab("confirmed"); navigate("provider-orders"); }} />
           <StatCard icon="⭐" label={t("Рейтинг")} value={ratingAvg.toFixed(1)}
             onClick={() => navigate("provider-reviews")} />
-          <StatCard icon="💬" label={t("Чаты с клиентами")} value={confirmedCount}
+          <StatCard icon="💬" label={t("Чаты с клиентами")} value={confirmedCount} badge={providerUnread.total}
             onClick={() => navigate("provider-messages")} />
         </div>
         <div className="tms-section">
@@ -2029,6 +2118,11 @@ export default function TbilisiMiniApp() {
           </div>
         )}
         <div className="tms-section">
+          <button className="tms-select-btn" style={{ width: "100%", padding: "12px" }} onClick={() => openProviderChat(o)}>
+            {t("💬 Чат с клиентом")}{providerUnread.byRequestId[o.requestId] > 0 ? ` (${providerUnread.byRequestId[o.requestId]})` : ""}
+          </button>
+        </div>
+        <div className="tms-section">
           {telegramLink ? (
             <a className="tms-select-btn" style={{ display: "block", width: "100%", padding: "12px", textAlign: "center", textDecoration: "none" }} href={telegramLink} target="_blank" rel="noreferrer">
               {t("💬 Написать в Telegram")}
@@ -2068,19 +2162,59 @@ export default function TbilisiMiniApp() {
     const confirmedOrders = getConfirmedOrders();
     return (
       <div className="tms-screen">
-        <div className="tms-section"><p className="tms-section-label">{t("Клиенты по активным заказам")}</p></div>
+        <div className="tms-section"><p className="tms-section-label">{t("Чаты по активным заказам")}</p></div>
         <div className="tms-list">
-          {confirmedOrders.map((o) => (
-            <button key={o.id} className="tms-list-row" onClick={() => openOrderDetail(o)}>
-              <span>
-                <span style={{ fontWeight: 600 }}>{o.request.user.name}</span>
-                <span className="tms-provider-meta" style={{ display: "block" }}>{t(o.request.service.name)}</span>
-              </span>
-              <span className="tms-chevron">→</span>
-            </button>
-          ))}
+          {confirmedOrders.map((o) => {
+            const unread = providerUnread.byRequestId[o.requestId ?? o.request.id] || 0;
+            return (
+              <button key={o.id} className="tms-list-row" onClick={() => openProviderChat(o)}>
+                <span>
+                  <span style={{ fontWeight: 600 }}>{o.request.user.name}</span>
+                  <span className="tms-provider-meta" style={{ display: "block" }}>{t(o.request.service.name)}</span>
+                </span>
+                {unread > 0 && <span className="tms-unread-dot">{unread}</span>}
+                <span className="tms-chevron">→</span>
+              </button>
+            );
+          })}
           {confirmedOrders.length === 0 && <p className="muted">{t("Активных заказов пока нет.")}</p>}
         </div>
+      </div>
+    );
+  }
+
+  function renderChatScreen() {
+    if (!chatData) return <div className="tms-screen"><p className="muted">{t("Загрузка…")}</p></div>;
+    return (
+      <div className="tms-chat">
+        <div className="tms-chat-messages" ref={chatScrollRef}>
+          {chatData.messages.length === 0 && (
+            <p className="muted" style={{ textAlign: "center", marginTop: 24 }}>{t("Сообщений пока нет — напишите первым.")}</p>
+          )}
+          {chatData.messages.map((m) => (
+            <div key={m.id} className={`tms-chat-bubble ${m.senderRole === chatData.role ? "is-mine" : ""}`}>
+              <p className="tms-chat-text">{m.text}</p>
+              <span className="tms-chat-time">{new Date(m.createdAt).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })}</span>
+            </div>
+          ))}
+        </div>
+        <div className="tms-chat-input-row">
+          <textarea
+            className="tms-chat-input"
+            rows={1}
+            placeholder={t("Сообщение…")}
+            value={chatText}
+            onChange={(e) => setChatText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                sendChatMessage();
+              }
+            }}
+          />
+          <button className="tms-chat-send" disabled={!chatText.trim() || chatSending} onClick={sendChatMessage}>➤</button>
+        </div>
+        {error && <p className="tms-error" style={{ padding: "0 16px 8px" }}>{error}</p>}
       </div>
     );
   }
@@ -2380,9 +2514,8 @@ export default function TbilisiMiniApp() {
             <Toggle checked={settingsForm.notifyRequests} onChange={(v) => { setSettingsForm((f) => ({ ...f, notifyRequests: v })); persistProviderPrefs({ notifyRequests: v }); }} label={t("Новые заявки")} />
             <Toggle checked={settingsForm.notifyReviews} onChange={(v) => { setSettingsForm((f) => ({ ...f, notifyReviews: v })); persistProviderPrefs({ notifyReviews: v }); }} label={t("Новые отзывы")} />
             <Toggle checked={settingsForm.notifyOrders} onChange={(v) => { setSettingsForm((f) => ({ ...f, notifyOrders: v })); persistProviderPrefs({ notifyOrders: v }); }} label={t("Действия по заказам")} />
-            <Toggle checked={settingsForm.notifyChat} onChange={(v) => setSettingsForm((f) => ({ ...f, notifyChat: v }))} label={t("Чат с клиентами")} />
+            <Toggle checked={settingsForm.notifyChat} onChange={(v) => { setSettingsForm((f) => ({ ...f, notifyChat: v })); persistProviderPrefs({ notifyChat: v }); }} label={t("Новые сообщения в чате")} />
           </div>
-          <p className="muted">{t("Чат с клиентами — донастроим отдельно, остальные уведомления уже приходят от Telegram-бота.")}</p>
         </div>
 
         <div className="tms-section">
@@ -2458,6 +2591,7 @@ export default function TbilisiMiniApp() {
       case "client-provider-view": return renderClientProviderView();
       case "client-my-orders": return renderClientMyOrders();
       case "client-order-detail": return renderClientOrderDetail();
+      case "client-chat": return renderChatScreen();
       case "client-review": return renderClientReview();
       case "client-reviews": return renderClientReviews(false);
       case "client-reviews-all": return renderClientReviews(true);
@@ -2470,6 +2604,7 @@ export default function TbilisiMiniApp() {
       case "provider-order-detail": return renderProviderOrderDetail();
       case "provider-client-review": return renderProviderClientReview();
       case "provider-messages": return renderProviderMessages();
+      case "provider-chat": return renderChatScreen();
       case "provider-offer": return renderProviderOffer();
       case "provider-profile-cabinet": return renderProviderProfileCabinet();
       case "provider-more": return renderProviderMore();
@@ -2498,6 +2633,7 @@ export default function TbilisiMiniApp() {
     "client-provider-view": t("Мастер"),
     "client-my-orders": t("Мои заказы"),
     "client-order-detail": t("Заказ"),
+    "client-chat": chatData?.otherName || t("Чат"),
     "client-review": t("Отзыв о мастере"),
     "client-reviews": t("Мой рейтинг"),
     "client-reviews-all": t("Все отзывы"),
@@ -2509,7 +2645,8 @@ export default function TbilisiMiniApp() {
     "provider-orders": t("Заказы"),
     "provider-order-detail": t("Заказ"),
     "provider-client-review": t("Отзыв о клиенте"),
-    "provider-messages": t("Сообщения"),
+    "provider-messages": t("Чаты"),
+    "provider-chat": chatData?.otherName || t("Чат"),
     "provider-offer": t("Ваш отклик"),
     "provider-profile-cabinet": t("Профиль"),
     "provider-more": t("Ещё"),
@@ -2730,6 +2867,21 @@ export default function TbilisiMiniApp() {
         .tms-archive summary { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 500; cursor: pointer; }
         .tms-starpicker { display: flex; gap: 6px; }
         .tms-starpicker-btn { border: none; background: transparent; font-size: 32px; line-height: 1; padding: 0; cursor: pointer; color: #D9A441; }
+
+        /* --- Чат по заказу --- */
+        .tms-unread-dot { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: #B4532F; color: #fff; font-size: 10.5px; font-weight: 700; line-height: 1; }
+        .tms-unread-dot-corner { position: absolute; top: -6px; right: -8px; }
+        .tms-chat { height: 100%; display: flex; flex-direction: column; }
+        .tms-chat-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+        .tms-chat-bubble { max-width: 78%; align-self: flex-start; background: var(--card); border: 1px solid var(--line); border-radius: 14px 14px 14px 4px; padding: 9px 12px; display: flex; flex-direction: column; gap: 3px; }
+        .tms-chat-bubble.is-mine { align-self: flex-end; background: var(--ink); color: var(--paper); border-color: var(--ink); border-radius: 14px 14px 4px 14px; }
+        .tms-chat-text { margin: 0; font-size: 13.5px; line-height: 1.4; white-space: pre-wrap; word-break: break-word; }
+        .tms-chat-time { font-size: 10px; color: var(--muted); align-self: flex-end; }
+        .tms-chat-bubble.is-mine .tms-chat-time { color: rgba(246,245,242,0.65); }
+        .tms-chat-input-row { flex-shrink: 0; display: flex; align-items: flex-end; gap: 8px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--paper); }
+        .tms-chat-input { flex: 1; resize: none; border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px; font-size: 13.5px; background: var(--card); color: var(--ink); font-family: inherit; max-height: 96px; }
+        .tms-chat-send { flex-shrink: 0; width: 38px; height: 38px; border-radius: 50%; border: none; background: var(--ink); color: var(--paper); font-size: 15px; cursor: pointer; }
+        .tms-chat-send:disabled { background: var(--line); color: var(--muted); cursor: default; }
       `}</style>
       <div className="tms-phone">
         <Header title={TITLES[screen]} onBack={showBack ? goBack : null} t={t} />
