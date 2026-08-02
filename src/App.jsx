@@ -12,9 +12,9 @@ const FACTOR_LABELS = {
   price: "Цена",
   rating: "Рейтинг",
   reviews: "Отзывы",
-  speed: "Скорость ответа",
+  verified: "Подтверждён профиль",
 };
-const FACTOR_WEIGHTS = { service: 30, distance: 20, price: 15, rating: 15, reviews: 10, speed: 10 };
+const FACTOR_WEIGHTS = { service: 30, distance: 20, price: 15, rating: 15, reviews: 10, verified: 10 };
 
 const STATUS_LABELS = {
   open: "поиск мастера",
@@ -146,7 +146,9 @@ const RU_TO_EN = {
   "Пока нет новых предложений.": "No new offers yet.",
   "Специализация не указана": "Specialization not specified",
   "✅ Подтверждён": "✅ Verified",
-  "⏳ На проверке": "⏳ Under review",
+  "Не подтверждён": "Not verified",
+  "Для подтверждения профиля напишите о своей квалификации в поддержку": "To get your profile verified, write about your qualifications to support",
+  "Понятно": "Got it",
   "Мастер пока не добавил описание.": "The pro hasn't added a description yet.",
   "Мастер пока не указал языки в профиле.": "The pro hasn't listed languages in their profile yet.",
   "Мастер": "Pro",
@@ -295,7 +297,7 @@ const RU_TO_EN = {
   "Совпадение по услуге": "Service match",
   "Расстояние": "Distance",
   "Цена": "Price",
-  "Скорость ответа": "Response speed",
+  "Подтверждён профиль": "Verified profile",
   // Категории и услуги — фиксированный список, который ведёт админ (не
   // произвольный текст от пользователей, поэтому переводим). Новую
   // категорию/услугу в админке — сразу добавлять перевод сюда, иначе
@@ -760,6 +762,7 @@ export default function TbilisiMiniApp() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [supportForm, setSupportForm] = useState({ subject: "", text: "" });
   const [supportTicket, setSupportTicket] = useState(null);
+  const [verifyInfoOpen, setVerifyInfoOpen] = useState(false);
 
   // ---- Чат по заказу (клиент ↔ мастер, доступен после подтверждения) ----
   const [chatRequestId, setChatRequestId] = useState(null);
@@ -1444,6 +1447,7 @@ export default function TbilisiMiniApp() {
                   <span className="tms-provider-name">{p.user.name}</span>
                   <span className="tms-provider-meta">{p.rating.toFixed(1)} · {p.reviewCount} {t("отз.")}</span>
                 </span>
+                <span className={`tms-badge-verify ${p.verified ? "is-verified" : ""}`}>{t(p.verified ? "✅ Подтверждён" : "Не подтверждён")}</span>
                 <MatchRing score={overall} />
               </button>
               {expandedCandidate === p.id && (
@@ -1475,7 +1479,10 @@ export default function TbilisiMiniApp() {
         <div className="tms-offer-top">
           <span className="tms-provider-avatar">👤</span>
           <div>
-            <p className="tms-provider-name">{o.provider.user.name}</p>
+            <p className="tms-provider-name">
+              {o.provider.user.name}{" "}
+              <span className={`tms-badge-verify ${o.provider.verified ? "is-verified" : ""}`}>{t(o.provider.verified ? "✅ Подтверждён" : "Не подтверждён")}</span>
+            </p>
             <p className="tms-provider-meta">★ {o.provider.rating.toFixed(1)}{showRequestLabel ? ` · ${t("Заявка")}: ${t(o.request.service.name)}` : ""}</p>
           </div>
           <p className="tms-offer-terms">{o.price} ₾</p>
@@ -1630,7 +1637,7 @@ export default function TbilisiMiniApp() {
               <p className="tms-provider-name" style={{ fontSize: 16 }}>{p.user.name}</p>
               <p className="tms-provider-meta">{specialization || t("Специализация не указана")}</p>
             </div>
-            <span className={`tms-badge-verify ${p.verified ? "is-verified" : ""}`}>{t(p.verified ? "✅ Подтверждён" : "⏳ На проверке")}</span>
+            <span className={`tms-badge-verify ${p.verified ? "is-verified" : ""}`}>{t(p.verified ? "✅ Подтверждён" : "Не подтверждён")}</span>
           </div>
           <p className="tms-provider-meta">★ {p.rating.toFixed(1)} · {p.reviewCount} {t("отз.")}</p>
         </div>
@@ -1700,7 +1707,7 @@ export default function TbilisiMiniApp() {
               <p className="tms-provider-name" style={{ fontSize: 16 }}>{offer?.provider.user.name || t("Мастер")}</p>
               <p className="tms-provider-meta">{t(r.service.name)}</p>
             </div>
-            {offer && <span className={`tms-badge-verify ${offer.provider.verified ? "is-verified" : ""}`}>{t(offer.provider.verified ? "✅ Подтверждён" : "⏳ На проверке")}</span>}
+            {offer && <span className={`tms-badge-verify ${offer.provider.verified ? "is-verified" : ""}`}>{t(offer.provider.verified ? "✅ Подтверждён" : "Не подтверждён")}</span>}
           </div>
           {offer && <p className="tms-provider-meta">★ {offer.provider.rating.toFixed(1)} · {offer.provider.reviewCount} {t("отз.")}</p>}
         </div>
@@ -2239,9 +2246,13 @@ export default function TbilisiMiniApp() {
                 <p className="tms-provider-name" style={{ fontSize: 16 }}>{tgUser.name}</p>
                 <p className="tms-provider-meta">{selectedCategoryNames.length ? selectedCategoryNames.join(" · ") : t("Категория не выбрана")}</p>
               </div>
-              <span className={`tms-badge-verify ${provider?.verified ? "is-verified" : ""}`}>
-                {t(provider?.verified ? "✅ Подтверждён" : "⏳ На проверке")}
-              </span>
+              {provider?.verified ? (
+                <span className="tms-badge-verify is-verified">{t("✅ Подтверждён")}</span>
+              ) : (
+                <button type="button" className="tms-badge-verify tms-badge-verify-btn" onClick={() => setVerifyInfoOpen(true)}>
+                  {t("Не подтверждён")}
+                </button>
+              )}
             </div>
             <textarea className="tms-textarea" rows={3} placeholder={t("Расскажите об опыте и специализации")}
               value={providerForm.description} onChange={(e) => setProviderForm((f) => ({ ...f, description: e.target.value }))} />
@@ -2838,6 +2849,9 @@ export default function TbilisiMiniApp() {
         .tms-badge { color: var(--accent); font-size: 16px; line-height: 1; }
         .tms-badge-verify { font-size: 10.5px; font-weight: 600; color: var(--muted); background: var(--paper); border-radius: 8px; padding: 4px 8px; white-space: nowrap; }
         .tms-badge-verify.is-verified { color: var(--accent); }
+        .tms-badge-verify-btn { border: 1px dashed var(--line); cursor: pointer; font-family: inherit; }
+        .tms-popup-overlay { position: absolute; inset: 0; background: rgba(20,22,26,0.45); display: flex; align-items: center; justify-content: center; padding: 24px; z-index: 20; }
+        .tms-popup-box { background: var(--card); border-radius: 16px; padding: 20px; width: 100%; display: flex; flex-direction: column; gap: 14px; }
         .tms-profile-card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
         .tms-profile-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
         .tms-profile-head > div { flex: 1; min-width: 0; }
@@ -2887,6 +2901,16 @@ export default function TbilisiMiniApp() {
         <Header title={TITLES[screen]} onBack={showBack ? goBack : null} t={t} />
         <div className="tms-body">{render()}</div>
         {bottomArea}
+        {verifyInfoOpen && (
+          <div className="tms-popup-overlay" onClick={() => setVerifyInfoOpen(false)}>
+            <div className="tms-popup-box" onClick={(e) => e.stopPropagation()}>
+              <p className="tms-body-text">{t("Для подтверждения профиля напишите о своей квалификации в поддержку")}</p>
+              <button className="tms-select-btn" style={{ width: "100%", padding: "12px" }} onClick={() => setVerifyInfoOpen(false)}>
+                {t("Понятно")}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
