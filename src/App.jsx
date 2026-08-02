@@ -251,8 +251,10 @@ const RU_TO_EN = {
   "Как только определимся с моделью монетизации — здесь можно будет выбрать тариф и продвижение анкеты.": "Once we settle on a monetization model, you'll be able to choose a plan and promote your profile here.",
   "Новые заявки": "New requests",
   "Новые отзывы": "New reviews",
+  "Новые отзывы обо мне": "New reviews about me",
   "Действия по заказам": "Order actions",
-  "Уведомления от Telegram-бота — донастроим отдельно.": "Telegram bot notifications — will be configured separately.",
+  "Чат с мастерами — донастроим отдельно, остальные уведомления уже приходят от Telegram-бота.": "Chat with pros — coming separately, other notifications already arrive via the Telegram bot.",
+  "Чат с клиентами — донастроим отдельно, остальные уведомления уже приходят от Telegram-бота.": "Chat with clients — coming separately, other notifications already arrive via the Telegram bot.",
   "Профиль будет скрыт и станет неактивным — вы пропадёте из ленты клиентов и подбора мастеров. Анкета, отклики, рейтинг и отзывы не удаляются и вернутся, если вы снова выберете «Я мастер». Продолжить?":
     "Your profile will be hidden and deactivated — you'll disappear from clients' feed and matching. Your profile, offers, rating and reviews aren't deleted and will come back if you pick \"I'm a pro\" again. Continue?",
   "Опишите проблему или предложение — обращение придёт в поддержку.": "Describe a problem or a suggestion — it'll reach support.",
@@ -644,6 +646,17 @@ export default function TbilisiMiniApp() {
     }).catch(() => {});
   }
 
+  // Настройки уведомлений мастера — симметрично persistPrefs у клиента,
+  // но своим эндпоинтом: провайдер, а не User, хранит notifyRequests/
+  // notifyReviews/notifyOrders (см. providersService.updatePrefs).
+  function persistProviderPrefs(partial) {
+    if (!provider) return Promise.resolve();
+    return api(`/providers/${provider.id}/prefs`, {
+      method: "PUT",
+      body: JSON.stringify({ telegramId: tgUser.id, ...partial }),
+    }).catch(() => {});
+  }
+
   useEffect(() => {
     // tgUser.id === null — идёт редирект в Telegram (см. getTelegramUser),
     // запрашивать нечего, страница вот-вот уйдёт со своего домена
@@ -658,6 +671,11 @@ export default function TbilisiMiniApp() {
         }
         setLanguage(lang);
         localStorage.setItem("app_language", lang);
+        setClientSettingsForm((f) => ({
+          ...f,
+          notifyOrders: res.notifyOrders ?? true,
+          notifyReviews: res.notifyReviews ?? true,
+        }));
         // Роль (клиент/мастер) уже выбирали раньше — сразу входим в её
         // кабинет вместо экрана role; chooseClient/chooseProvider сами
         // подгружают данные и переходят на нужный экран.
@@ -692,6 +710,7 @@ export default function TbilisiMiniApp() {
     phone: "",
     email: "",
     notifyOrders: true,
+    notifyReviews: true,
     notifyChat: true,
   });
   const [clientShowDeleteConfirm, setClientShowDeleteConfirm] = useState(false);
@@ -968,6 +987,12 @@ export default function TbilisiMiniApp() {
           serviceIds: (full.services || []).map((s) => s.serviceId ?? s.service?.id).filter(Boolean),
           areas: (full.areas || []).map((a) => a.area ?? a),
         });
+        setSettingsForm((f) => ({
+          ...f,
+          notifyRequests: full.notifyRequests ?? true,
+          notifyReviews: full.notifyReviews ?? true,
+          notifyOrders: full.notifyOrders ?? true,
+        }));
         await ensureAllServices();
         await loadProviderInbox(full);
         goTab("provider-dashboard");
@@ -1690,9 +1715,11 @@ export default function TbilisiMiniApp() {
         <div className="tms-section">
           <p className="tms-section-label">{t("Уведомления")}</p>
           <div className="tms-profile-card">
-            <Toggle checked={clientSettingsForm.notifyOrders} onChange={(v) => setClientSettingsForm((f) => ({ ...f, notifyOrders: v }))} label={t("Заявки взяты в работу")} />
+            <Toggle checked={clientSettingsForm.notifyOrders} onChange={(v) => { setClientSettingsForm((f) => ({ ...f, notifyOrders: v })); persistPrefs({ notifyOrders: v }); }} label={t("Заявки взяты в работу")} />
+            <Toggle checked={clientSettingsForm.notifyReviews} onChange={(v) => { setClientSettingsForm((f) => ({ ...f, notifyReviews: v })); persistPrefs({ notifyReviews: v }); }} label={t("Новые отзывы обо мне")} />
             <Toggle checked={clientSettingsForm.notifyChat} onChange={(v) => setClientSettingsForm((f) => ({ ...f, notifyChat: v }))} label={t("Чат с мастерами")} />
           </div>
+          <p className="muted">{t("Чат с мастерами — донастроим отдельно, остальные уведомления уже приходят от Telegram-бота.")}</p>
         </div>
 
         <div className="tms-section">
@@ -2350,12 +2377,12 @@ export default function TbilisiMiniApp() {
         <div className="tms-section">
           <p className="tms-section-label">{t("Уведомления")}</p>
           <div className="tms-profile-card">
-            <Toggle checked={settingsForm.notifyRequests} onChange={(v) => setSettingsForm((f) => ({ ...f, notifyRequests: v }))} label={t("Новые заявки")} />
-            <Toggle checked={settingsForm.notifyReviews} onChange={(v) => setSettingsForm((f) => ({ ...f, notifyReviews: v }))} label={t("Новые отзывы")} />
-            <Toggle checked={settingsForm.notifyOrders} onChange={(v) => setSettingsForm((f) => ({ ...f, notifyOrders: v }))} label={t("Действия по заказам")} />
+            <Toggle checked={settingsForm.notifyRequests} onChange={(v) => { setSettingsForm((f) => ({ ...f, notifyRequests: v })); persistProviderPrefs({ notifyRequests: v }); }} label={t("Новые заявки")} />
+            <Toggle checked={settingsForm.notifyReviews} onChange={(v) => { setSettingsForm((f) => ({ ...f, notifyReviews: v })); persistProviderPrefs({ notifyReviews: v }); }} label={t("Новые отзывы")} />
+            <Toggle checked={settingsForm.notifyOrders} onChange={(v) => { setSettingsForm((f) => ({ ...f, notifyOrders: v })); persistProviderPrefs({ notifyOrders: v }); }} label={t("Действия по заказам")} />
             <Toggle checked={settingsForm.notifyChat} onChange={(v) => setSettingsForm((f) => ({ ...f, notifyChat: v }))} label={t("Чат с клиентами")} />
           </div>
-          <p className="muted">{t("Уведомления от Telegram-бота — донастроим отдельно.")}</p>
+          <p className="muted">{t("Чат с клиентами — донастроим отдельно, остальные уведомления уже приходят от Telegram-бота.")}</p>
         </div>
 
         <div className="tms-section">
