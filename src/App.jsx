@@ -44,12 +44,13 @@ const RU_TO_EN = {
   "Отмена": "Cancel",
   "Готово": "Done",
   "Имя": "Name",
-  "Телефон": "Phone",
-  "Email": "Email",
   "Описание": "Description",
   "Языки": "Languages",
   "Поддержка": "Support",
   "Написать в поддержку →": "Contact support →",
+  "Правовая информация": "Legal",
+  "Пользовательское соглашение →": "Terms of service →",
+  "Политика конфиденциальности →": "Privacy policy →",
   "Режим": "Mode",
   "Перейти в кабинет мастера →": "Switch to provider account →",
   "Перейти в кабинет клиента →": "Switch to client account →",
@@ -717,8 +718,6 @@ export default function TbilisiMiniApp() {
   const [submittedReviews, setSubmittedReviews] = useState({});
   const [clientSettingsForm, setClientSettingsForm] = useState({
     name: tgUser.name,
-    phone: "",
-    email: "",
     notifyOrders: true,
     notifyReviews: true,
     notifyChat: true,
@@ -742,9 +741,7 @@ export default function TbilisiMiniApp() {
   const [clientReviewForm, setClientReviewForm] = useState({ rating: 5, text: "" });
   const [profileExtra, setProfileExtra] = useState({
     languages: ["Русский"],
-    phone: "",
     telegramContact: tgUser.username ? `@${tgUser.username}` : "",
-    email: "",
     contactsHidden: false,
     calloutPrice: "",
     minOrderPrice: "",
@@ -752,8 +749,6 @@ export default function TbilisiMiniApp() {
   });
   const [settingsForm, setSettingsForm] = useState({
     name: tgUser.name,
-    phone: "",
-    email: "",
     notifyRequests: true,
     notifyReviews: true,
     notifyOrders: true,
@@ -1801,10 +1796,6 @@ export default function TbilisiMiniApp() {
             <div className="tms-field-group">
               <label className="tms-field"><span>{t("Имя")}</span><input className="tms-field-input"
                 value={clientSettingsForm.name} onChange={(e) => setClientSettingsForm((f) => ({ ...f, name: e.target.value }))} /></label>
-              <label className="tms-field"><span>{t("Телефон")}</span><input className="tms-field-input" placeholder="+995 5xx xx xx xx"
-                value={clientSettingsForm.phone} onChange={(e) => setClientSettingsForm((f) => ({ ...f, phone: e.target.value }))} /></label>
-              <label className="tms-field"><span>{t("Email")}</span><input className="tms-field-input" placeholder="mail@example.com"
-                value={clientSettingsForm.email} onChange={(e) => setClientSettingsForm((f) => ({ ...f, email: e.target.value }))} /></label>
             </div>
           </div>
         </div>
@@ -1826,6 +1817,12 @@ export default function TbilisiMiniApp() {
         <div className="tms-section">
           <p className="tms-section-label">{t("Поддержка")}</p>
           <button className="tms-link-row" onClick={() => navigate("client-support")}>{t("Написать в поддержку →")}</button>
+        </div>
+
+        <div className="tms-section">
+          <p className="tms-section-label">{t("Правовая информация")}</p>
+          <a className="tms-link-row" style={{ display: "block", textDecoration: "none", marginBottom: 6 }} href="/terms.html" target="_blank" rel="noreferrer">{t("Пользовательское соглашение →")}</a>
+          <a className="tms-link-row" style={{ display: "block", textDecoration: "none" }} href="/privacy.html" target="_blank" rel="noreferrer">{t("Политика конфиденциальности →")}</a>
         </div>
 
         <div className="tms-section">
@@ -2269,12 +2266,8 @@ export default function TbilisiMiniApp() {
         <div className="tms-section">
           <p className="tms-section-label">{t("Контакты")}</p>
           <div className="tms-field-group">
-            <label className="tms-field"><span>{t("Телефон")}</span><input className="tms-field-input" placeholder="+995 5xx xx xx xx"
-              value={profileExtra.phone} onChange={(e) => setProfileExtra((f) => ({ ...f, phone: e.target.value }))} /></label>
             <label className="tms-field"><span>Telegram</span><input className="tms-field-input" placeholder="@username"
               value={profileExtra.telegramContact} onChange={(e) => setProfileExtra((f) => ({ ...f, telegramContact: e.target.value }))} /></label>
-            <label className="tms-field"><span>{t("Email")}</span><input className="tms-field-input" placeholder="mail@example.com"
-              value={profileExtra.email} onChange={(e) => setProfileExtra((f) => ({ ...f, email: e.target.value }))} /></label>
           </div>
           <Toggle checked={profileExtra.contactsHidden} onChange={(v) => setProfileExtra((f) => ({ ...f, contactsHidden: v }))}
             label={t("Скрывать контакты от клиентов")} sub={t("Клиент увидит контакты только после подтверждения заказа")} />
@@ -2512,10 +2505,6 @@ export default function TbilisiMiniApp() {
           <div className="tms-field-group">
             <label className="tms-field"><span>{t("Имя")}</span><input className="tms-field-input"
               value={settingsForm.name} onChange={(e) => setSettingsForm((f) => ({ ...f, name: e.target.value }))} /></label>
-            <label className="tms-field"><span>{t("Телефон")}</span><input className="tms-field-input" placeholder="+995 5xx xx xx xx"
-              value={settingsForm.phone} onChange={(e) => setSettingsForm((f) => ({ ...f, phone: e.target.value }))} /></label>
-            <label className="tms-field"><span>{t("Email")}</span><input className="tms-field-input" placeholder="mail@example.com"
-              value={settingsForm.email} onChange={(e) => setSettingsForm((f) => ({ ...f, email: e.target.value }))} /></label>
           </div>
         </div>
 
@@ -2532,6 +2521,12 @@ export default function TbilisiMiniApp() {
         <div className="tms-section">
           <p className="tms-section-label">{t("Поддержка")}</p>
           <button className="tms-link-row" onClick={() => navigate("provider-support")}>{t("Написать в поддержку →")}</button>
+        </div>
+
+        <div className="tms-section">
+          <p className="tms-section-label">{t("Правовая информация")}</p>
+          <a className="tms-link-row" style={{ display: "block", textDecoration: "none", marginBottom: 6 }} href="/terms.html" target="_blank" rel="noreferrer">{t("Пользовательское соглашение →")}</a>
+          <a className="tms-link-row" style={{ display: "block", textDecoration: "none" }} href="/privacy.html" target="_blank" rel="noreferrer">{t("Политика конфиденциальности →")}</a>
         </div>
 
         <div className="tms-section">
