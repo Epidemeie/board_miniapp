@@ -1647,7 +1647,7 @@ export default function TbilisiMiniApp() {
               {p.website && (
                 <div className="tms-partner-contact-row">
                   <span className="tms-partner-contact-label">{t("Сайт")}</span>
-                  <a className="tms-partner-contact-value" href={p.website} target="_blank" rel="noreferrer">{p.website}</a>
+                  <a className="tms-partner-contact-value" href={p.website} target="_blank" rel="noreferrer">{p.websiteLabel || p.website}</a>
                 </div>
               )}
               {p.telegram && (
