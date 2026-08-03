@@ -859,6 +859,16 @@ export default function TbilisiMiniApp() {
     api("/partners").then(setPartners).catch(() => {});
   }
 
+  // Показ баннера/клик «Узнать больше» — статистика для партнёров и
+  // будущего прайсинга размещений (см. Partner.impressionCount/clickCount).
+  function trackPartnerImpressions(ids) {
+    if (ids.length === 0) return;
+    api("/partners/impressions", { method: "POST", body: JSON.stringify({ ids }) }).catch(() => {});
+  }
+  function trackPartnerClick(id) {
+    api(`/partners/${id}/click`, { method: "POST" }).catch(() => {});
+  }
+
   async function chooseClient() {
     await withLoading(async () => {
       await Promise.all([loadMyRequests(), loadClientProfile()]);
@@ -1074,6 +1084,14 @@ export default function TbilisiMiniApp() {
   useEffect(() => {
     if (chatScrollRef.current) chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
   }, [chatData?.messages.length]);
+
+  // Показ баннеров партнёров — считаем при заходе на экран, где они реально
+  // видны (лента на главной или полный список), а не на каждый ре-рендер.
+  useEffect(() => {
+    if (screen !== "client-dashboard" && screen !== "partners") return;
+    trackPartnerImpressions(partners.map((p) => p.id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen, partners]);
 
   async function chooseProvider() {
     await withLoading(async () => {
@@ -1569,6 +1587,7 @@ export default function TbilisiMiniApp() {
   }
 
   function openPartnerDetail(id) {
+    trackPartnerClick(id);
     setPartnerDetailId(id);
     navigate("partner-detail");
   }
