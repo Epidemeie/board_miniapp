@@ -854,9 +854,11 @@ export default function TbilisiMiniApp() {
   }
 
   // Партнёрские баннеры — не влияют на подбор мастеров, поэтому грузим
-  // отдельно и не блокируем ими вход в кабинет (fire-and-forget).
-  function loadPartners() {
-    api("/partners").then(setPartners).catch(() => {});
+  // отдельно и не блокируем ими вход в кабинет (fire-and-forget). Клиент и
+  // мастер видят независимо управляемые в админке наборы (Partner.active
+  // / Partner.showProviders).
+  function loadPartners(audience = "client") {
+    api(`/partners?audience=${audience}`).then(setPartners).catch(() => {});
   }
 
   // Показ баннера/клик «Узнать больше» — статистика для партнёров и
@@ -1086,9 +1088,11 @@ export default function TbilisiMiniApp() {
   }, [chatData?.messages.length]);
 
   // Показ баннеров партнёров — считаем при заходе на экран, где они реально
-  // видны (лента на главной или полный список), а не на каждый ре-рендер.
+  // видны (лента на главной клиента/мастера или полный список), а не на
+  // каждый ре-рендер.
+  const PARTNER_VISIBLE_SCREENS = ["client-dashboard", "provider-dashboard", "partners"];
   useEffect(() => {
-    if (screen !== "client-dashboard" && screen !== "partners") return;
+    if (!PARTNER_VISIBLE_SCREENS.includes(screen)) return;
     trackPartnerImpressions(partners.map((p) => p.id));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screen, partners]);
@@ -1114,6 +1118,7 @@ export default function TbilisiMiniApp() {
         }));
         await ensureAllServices();
         await loadProviderInbox(full);
+        loadPartners("provider");
         goTab("provider-dashboard");
       } else {
         await ensureAllServices();
@@ -1559,29 +1564,34 @@ export default function TbilisiMiniApp() {
         <div className="tms-section">
           <button className="tms-mainbutton" onClick={openCreateRequest}>{t("+ Создать заявку")}</button>
         </div>
-        {partners.length > 0 && (
-          <div className="tms-section tms-sponsor-strip">
-            <div className="tms-sponsor-label-row">
-              <button type="button" className="tms-sponsor-label" onClick={() => navigate("partners")}>{t("Партнёры")}</button>
-              <button type="button" className="tms-sponsor-label-arrow" onClick={() => navigate("partners")}>{t("Все →")}</button>
-            </div>
-            <div className="tms-sponsor-scroll">
-              {partners.map((p) => (
-                <div key={p.id} className="tms-sponsor-card" onClick={() => openPartnerDetail(p.id)}>
-                  <div className="tms-sponsor-top">
-                    <PartnerLogo partner={p} className="tms-sponsor-logo" />
-                    <div>
-                      <div className="tms-sponsor-name">{p.name}</div>
-                      {p.tag && <div className="tms-sponsor-tag">{p.tag}</div>}
-                    </div>
-                  </div>
-                  {p.offerText && <div className="tms-sponsor-desc">{p.offerText}</div>}
-                  <div className="tms-sponsor-cta">{t("Узнать больше →")}</div>
+        {renderPartnerStrip()}
+      </div>
+    );
+  }
+
+  function renderPartnerStrip() {
+    if (partners.length === 0) return null;
+    return (
+      <div className="tms-section tms-sponsor-strip">
+        <div className="tms-sponsor-label-row">
+          <button type="button" className="tms-sponsor-label" onClick={() => navigate("partners")}>{t("Партнёры")}</button>
+          <button type="button" className="tms-sponsor-label-arrow" onClick={() => navigate("partners")}>{t("Все →")}</button>
+        </div>
+        <div className="tms-sponsor-scroll">
+          {partners.map((p) => (
+            <div key={p.id} className="tms-sponsor-card" onClick={() => openPartnerDetail(p.id)}>
+              <div className="tms-sponsor-top">
+                <PartnerLogo partner={p} className="tms-sponsor-logo" />
+                <div>
+                  <div className="tms-sponsor-name">{p.name}</div>
+                  {p.tag && <div className="tms-sponsor-tag">{p.tag}</div>}
                 </div>
-              ))}
+              </div>
+              {p.offerText && <div className="tms-sponsor-desc">{p.offerText}</div>}
+              <div className="tms-sponsor-cta">{t("Узнать больше →")}</div>
             </div>
-          </div>
-        )}
+          ))}
+        </div>
       </div>
     );
   }
@@ -2105,6 +2115,7 @@ export default function TbilisiMiniApp() {
             <div className="tms-funnel-step"><span className="tms-funnel-value">{funnel.conversion}%</span><span className="tms-provider-meta">{t("конверсия")}</span></div>
           </div>
         </div>
+        {renderPartnerStrip()}
       </div>
     );
   }
