@@ -51,6 +51,13 @@ const RU_TO_EN = {
   "Правовая информация": "Legal",
   "Пользовательское соглашение →": "Terms of service →",
   "Политика конфиденциальности →": "Privacy policy →",
+  "Партнёры": "Partners",
+  "О партнёре": "About partner",
+  "Все →": "All →",
+  "Узнать больше →": "Learn more →",
+  "Скидки и предложения от локальных компаний — специально для пользователей Tbilisi Services": "Discounts and offers from local businesses — just for Tbilisi Services users",
+  "Партнёров пока нет.": "No partners yet.",
+  "Сайт": "Website",
   "Режим": "Mode",
   "Перейти в кабинет мастера →": "Switch to provider account →",
   "Перейти в кабинет клиента →": "Switch to client account →",
@@ -571,6 +578,12 @@ function StatCard({ icon, label, value, onClick, tone, badge }) {
   );
 }
 
+function PartnerLogo({ partner, className }) {
+  return partner.logoImage
+    ? <img className={className} src={partner.logoImage} alt="" style={{ objectFit: "cover" }} />
+    : <div className={className}>{partner.logoEmoji || "🏷️"}</div>;
+}
+
 function Segmented({ options, value, onChange }) {
   return (
     <div className="tms-segmented">
@@ -701,6 +714,8 @@ export default function TbilisiMiniApp() {
   // ---- Клиент: создание заявки (существующий рабочий поток) ----
   const [categories, setCategories] = useState([]);
   const [services, setServices] = useState([]);
+  const [partners, setPartners] = useState([]);
+  const [partnerDetailId, setPartnerDetailId] = useState(null);
   const [form, setForm] = useState({ categoryId: null, categoryName: null, serviceId: null, serviceName: null, description: "", district: null, urgency: null, budget: 100 });
   const [candidates, setCandidates] = useState([]);
   const [expandedCandidate, setExpandedCandidate] = useState(null);
@@ -838,10 +853,17 @@ export default function TbilisiMiniApp() {
     setClientProfile(existing ? await api(`/users/${existing.id}`) : null);
   }
 
+  // Партнёрские баннеры — не влияют на подбор мастеров, поэтому грузим
+  // отдельно и не блокируем ими вход в кабинет (fire-and-forget).
+  function loadPartners() {
+    api("/partners").then(setPartners).catch(() => {});
+  }
+
   async function chooseClient() {
     await withLoading(async () => {
       await Promise.all([loadMyRequests(), loadClientProfile()]);
     });
+    loadPartners();
     goTab("client-dashboard");
   }
 
@@ -1519,6 +1541,111 @@ export default function TbilisiMiniApp() {
         <div className="tms-section">
           <button className="tms-mainbutton" onClick={openCreateRequest}>{t("+ Создать заявку")}</button>
         </div>
+        {partners.length > 0 && (
+          <div className="tms-section tms-sponsor-strip">
+            <div className="tms-sponsor-label-row">
+              <button type="button" className="tms-sponsor-label" onClick={() => navigate("partners")}>{t("Партнёры")}</button>
+              <button type="button" className="tms-sponsor-label-arrow" onClick={() => navigate("partners")}>{t("Все →")}</button>
+            </div>
+            <div className="tms-sponsor-scroll">
+              {partners.map((p) => (
+                <div key={p.id} className="tms-sponsor-card" onClick={() => openPartnerDetail(p.id)}>
+                  <div className="tms-sponsor-top">
+                    <PartnerLogo partner={p} className="tms-sponsor-logo" />
+                    <div>
+                      <div className="tms-sponsor-name">{p.name}</div>
+                      {p.tag && <div className="tms-sponsor-tag">{p.tag}</div>}
+                    </div>
+                  </div>
+                  {p.offerText && <div className="tms-sponsor-desc">{p.offerText}</div>}
+                  <div className="tms-sponsor-cta">{t("Узнать больше →")}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function openPartnerDetail(id) {
+    setPartnerDetailId(id);
+    navigate("partner-detail");
+  }
+
+  function renderPartnersList() {
+    return (
+      <div className="tms-screen">
+        <div className="tms-section" style={{ marginTop: 4 }}>
+          <p className="tms-body-text">{t("Скидки и предложения от локальных компаний — специально для пользователей Tbilisi Services")}</p>
+        </div>
+        <div className="tms-section tms-banner-list">
+          {partners.map((p) => (
+            <div key={p.id} className="tms-banner-card" onClick={() => openPartnerDetail(p.id)}>
+              <div className="tms-banner-top">
+                <PartnerLogo partner={p} className="tms-banner-logo" />
+                <div>
+                  <div className="tms-banner-name">{p.name}</div>
+                  {p.tag && <div className="tms-banner-tag">{p.tag}</div>}
+                </div>
+              </div>
+              {p.description && <div className="tms-banner-desc">{p.description}</div>}
+              <div className="tms-banner-cta-row"><span className="tms-banner-cta">{t("Узнать больше →")}</span></div>
+            </div>
+          ))}
+          {partners.length === 0 && <p className="muted">{t("Партнёров пока нет.")}</p>}
+        </div>
+      </div>
+    );
+  }
+
+  function renderPartnerDetail() {
+    const p = partners.find((x) => x.id === partnerDetailId);
+    if (!p) return null;
+    return (
+      <div className="tms-screen">
+        <div className="tms-section" style={{ marginTop: 4 }}>
+          <div className="tms-partner-hero">
+            <PartnerLogo partner={p} className="tms-partner-logo-big" />
+            <div className="tms-partner-name-big">{p.name}</div>
+            {p.tag && <div className="tms-partner-tag-big">{p.tag}</div>}
+          </div>
+        </div>
+        {p.description && (
+          <div className="tms-section tms-partner-section">
+            <p className="tms-body-text">{p.description}</p>
+          </div>
+        )}
+        {p.offerText && (
+          <div className="tms-section">
+            <div className="tms-partner-offer">🎁 {p.offerText}</div>
+          </div>
+        )}
+        {(p.website || p.telegram || p.area) && (
+          <div className="tms-section">
+            <p className="tms-section-label">{t("Контакты")}</p>
+            <div className="tms-partner-contacts">
+              {p.website && (
+                <div className="tms-partner-contact-row">
+                  <span className="tms-partner-contact-label">{t("Сайт")}</span>
+                  <a className="tms-partner-contact-value" href={p.website} target="_blank" rel="noreferrer">{p.website}</a>
+                </div>
+              )}
+              {p.telegram && (
+                <div className="tms-partner-contact-row">
+                  <span className="tms-partner-contact-label">Telegram</span>
+                  <a className="tms-partner-contact-value" href={`https://t.me/${p.telegram.replace(/^@/, "")}`} target="_blank" rel="noreferrer">{p.telegram}</a>
+                </div>
+              )}
+              {p.area && (
+                <div className="tms-partner-contact-row">
+                  <span className="tms-partner-contact-label">{t("Район")}</span>
+                  <span className="tms-partner-contact-value">{t(p.area)}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -2603,6 +2730,8 @@ export default function TbilisiMiniApp() {
       case "client-reviews-all": return renderClientReviews(true);
       case "client-profile": return renderClientProfile();
       case "client-support": return renderSupportForm();
+      case "partners": return renderPartnersList();
+      case "partner-detail": return renderPartnerDetail();
       case "provider-register": return renderProviderRegister();
       case "provider-dashboard": return renderProviderDashboard();
       case "provider-requests": return renderProviderRequests();
@@ -2645,6 +2774,8 @@ export default function TbilisiMiniApp() {
     "client-reviews-all": t("Все отзывы"),
     "client-profile": t("Профиль"),
     "client-support": t("Поддержка"),
+    partners: t("Партнёры"),
+    "partner-detail": t("О партнёре"),
     "provider-register": t("Регистрация мастера"),
     "provider-dashboard": t("Личный кабинет"),
     "provider-requests": t("Заявки"),
@@ -2891,6 +3022,43 @@ export default function TbilisiMiniApp() {
         .tms-chat-input { flex: 1; resize: none; border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px; font-size: 13.5px; background: var(--card); color: var(--ink); font-family: inherit; max-height: 96px; }
         .tms-chat-send { flex-shrink: 0; width: 38px; height: 38px; border-radius: 50%; border: none; background: var(--ink); color: var(--paper); font-size: 15px; cursor: pointer; }
         .tms-chat-send:disabled { background: var(--line); color: var(--muted); cursor: default; }
+
+        /* Партнёрские баннеры — намеренно тёплая, не зелёная палитра, чтобы
+           не путаться с рейтингом/бейджем «Подтверждён» у мастеров. */
+        .tms-sponsor-strip { display: flex; flex-direction: column; gap: 8px; }
+        .tms-sponsor-label-row { display: flex; align-items: center; justify-content: space-between; }
+        .tms-sponsor-label { border: none; background: transparent; padding: 0; font-family: inherit; cursor: pointer; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.07em; color: #A8791E; font-weight: 700; display: flex; align-items: center; gap: 5px; }
+        .tms-sponsor-label::before { content: "◆"; font-size: 8px; }
+        .tms-sponsor-label-arrow { border: none; background: transparent; padding: 0; font-family: inherit; cursor: pointer; font-size: 11px; color: #A8791E; font-weight: 600; }
+        .tms-sponsor-scroll { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 2px; margin: 0 -16px; padding-left: 16px; padding-right: 16px; }
+        .tms-sponsor-card { flex: 0 0 auto; width: 210px; background: #FBF6EC; border: 1px solid #E9D9B4; border-radius: 14px; padding: 12px 13px; display: flex; flex-direction: column; gap: 7px; cursor: pointer; }
+        .tms-sponsor-top { display: flex; align-items: center; gap: 9px; }
+        .tms-sponsor-logo { width: 32px; height: 32px; border-radius: 9px; background: var(--card); border: 1px solid #E9D9B4; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+        .tms-sponsor-name { font-size: 12.5px; font-weight: 700; line-height: 1.25; }
+        .tms-sponsor-tag { font-size: 10px; color: #A8791E; font-weight: 600; margin-top: 1px; }
+        .tms-sponsor-desc { font-size: 11px; color: var(--muted); line-height: 1.4; }
+        .tms-sponsor-cta { font-size: 11px; font-weight: 700; color: #A8791E; }
+
+        .tms-banner-list { display: flex; flex-direction: column; gap: 12px; }
+        .tms-banner-card { background: #FBF6EC; border: 1px solid #E9D9B4; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 10px; cursor: pointer; }
+        .tms-banner-top { display: flex; align-items: center; gap: 12px; }
+        .tms-banner-logo { width: 40px; height: 40px; border-radius: 11px; background: var(--card); border: 1px solid #E9D9B4; display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0; }
+        .tms-banner-name { font-size: 13.5px; font-weight: 700; }
+        .tms-banner-tag { font-size: 10.5px; color: #A8791E; font-weight: 600; margin-top: 1px; }
+        .tms-banner-desc { font-size: 12px; color: var(--muted); line-height: 1.45; }
+        .tms-banner-cta-row { display: flex; justify-content: flex-end; }
+        .tms-banner-cta { font-size: 12px; font-weight: 700; color: #A8791E; }
+
+        .tms-partner-hero { background: #FBF6EC; border: 1px solid #E9D9B4; border-radius: 18px; padding: 20px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; }
+        .tms-partner-logo-big { width: 54px; height: 54px; border-radius: 15px; background: var(--card); border: 1px solid #E9D9B4; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+        .tms-partner-name-big { font-size: 16px; font-weight: 700; margin-top: 4px; }
+        .tms-partner-tag-big { font-size: 11.5px; color: #A8791E; font-weight: 600; }
+        .tms-partner-offer { background: var(--card); border: 1px dashed #E9D9B4; border-radius: 12px; padding: 12px 14px; font-size: 13px; font-weight: 600; color: #A8791E; text-align: center; }
+        .tms-partner-contacts { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--card); }
+        .tms-partner-contact-row { padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; border-bottom: 1px solid var(--line); }
+        .tms-partner-contact-row:last-child { border-bottom: none; }
+        .tms-partner-contact-label { color: var(--muted); }
+        .tms-partner-contact-value { font-weight: 600; color: var(--ink); text-decoration: none; }
       `}</style>
       <div className="tms-phone">
         <Header title={TITLES[screen]} onBack={showBack ? goBack : null} t={t} />
