@@ -295,6 +295,8 @@ const RU_TO_EN = {
   "Отправляю…": "Sending…",
   "Отправить заявку": "Send request",
   "Сохраняю…": "Saving…",
+  "Сохранить изменения": "Save changes",
+  "Выберите хотя бы одну услугу и один район": "Select at least one service and one area",
   "Оставить отзыв и завершить": "Leave a review and complete",
   "Отправить отклик": "Send offer",
   "Выберите хотя бы одну услугу": "Select at least one service",
@@ -1163,6 +1165,27 @@ export default function TbilisiMiniApp() {
       setProvider(created);
       await loadProviderInbox(created);
       goTab("provider-dashboard");
+    });
+  }
+
+  // Сохранение изменений в кабинете уже зарегистрированного мастера —
+  // раньше переключатели услуг/районов на этом экране меняли только
+  // локальный providerForm и никуда не отправлялись, поэтому мастер не мог
+  // сам добавить/убрать услугу (см. PUT /providers/:id/profile).
+  async function saveProviderProfile() {
+    await withLoading(async () => {
+      const updated = await api(`/providers/${provider.id}/profile`, {
+        method: "PUT",
+        body: JSON.stringify({
+          telegramId: tgUser.id,
+          description: providerForm.description,
+          priceFrom: providerForm.priceFrom ? Number(providerForm.priceFrom) : undefined,
+          serviceIds: providerForm.serviceIds,
+          areas: providerForm.areas,
+        }),
+      });
+      setProvider(updated);
+      await loadProviderInbox(updated);
     });
   }
 
@@ -2467,6 +2490,17 @@ export default function TbilisiMiniApp() {
             <label className="tms-field"><span>{t("Почасовая ставка, ₾")}</span><input className="tms-field-input" type="number" placeholder="40"
               value={profileExtra.hourlyRate} onChange={(e) => setProfileExtra((f) => ({ ...f, hourlyRate: e.target.value }))} /></label>
           </div>
+        </div>
+
+        <div className="tms-section">
+          <button className="tms-mainbutton" disabled={loading || providerForm.serviceIds.length === 0 || providerForm.areas.length === 0}
+            onClick={saveProviderProfile}>
+            {loading ? t("Сохраняю…") : t("Сохранить изменения")}
+          </button>
+          {(providerForm.serviceIds.length === 0 || providerForm.areas.length === 0) && (
+            <p className="muted" style={{ marginTop: 8 }}>{t("Выберите хотя бы одну услугу и один район")}</p>
+          )}
+          {error && <p className="tms-error">{error}</p>}
         </div>
       </div>
     );
